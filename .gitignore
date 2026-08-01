@@ -1,0 +1,31 @@
+# OS
+.DS_Store
+
+# Local tooling
+.tools/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Python
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.py[cod]
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/data/
+backend/*.db
+
+# Node
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
