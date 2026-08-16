@@ -25,6 +25,7 @@ export type ParseJobSuccess = {
   messages: number
   skipped: number
   elapsed: string
+  elapsed_ms?: number
   status: string
 }
 

@@ -1,4 +1,14 @@
 import type {
+  AskResponse,
+  ConversationFilters,
+  ConversationListResponse,
+  ConversationSummary,
+  DashboardResponse,
+  MessageListResponse,
+  SearchResponse,
+  UserSettings,
+} from "@/types/api"
+import type {
   ImportJobError,
   ImportJobSuccess,
   ParseJobSuccess,
@@ -31,6 +41,18 @@ export function formatImportedAt(value: string | null | undefined): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date)
+}
+
+export function formatDate(value: string | null | undefined): string {
+  if (!value) return "—"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date)
+}
+
+export function conversationTitle(title: string | null | undefined): string {
+  const trimmed = title?.trim()
+  return trimmed ? trimmed : "Untitled conversation"
 }
 
 type UploadChatGPTOptions = {
@@ -112,11 +134,101 @@ export function uploadChatGPTExport({
 }
 
 export async function parseImportJob(importId: string): Promise<ParseJobSuccess> {
+  return apiFetch<ParseJobSuccess>(`/import/${importId}/parse`, { method: "POST" })
+}
+
+export async function listConversations(
+  filters: Partial<ConversationFilters>
+): Promise<ConversationListResponse> {
+  const params = new URLSearchParams()
+  params.set("page", String(filters.page ?? 1))
+  params.set("page_size", String(filters.pageSize ?? 30))
+  if (filters.search) params.set("search", filters.search)
+  if (filters.source) params.set("source", filters.source)
+  if (filters.range && filters.range !== "all") params.set("range", filters.range)
+  if (filters.dateFrom) params.set("date_from", filters.dateFrom)
+  if (filters.dateTo) params.set("date_to", filters.dateTo)
+  if (filters.sort) params.set("sort", filters.sort)
+  return apiFetch<ConversationListResponse>(`/conversations?${params.toString()}`)
+}
+
+export async function getConversation(
+  id: string
+): Promise<ConversationSummary> {
+  return apiFetch<ConversationSummary>(`/conversations/${id}`)
+}
+
+export async function getConversationMessages(
+  id: string,
+  page = 1,
+  pageSize = 80,
+  around?: string
+): Promise<MessageListResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+  })
+  if (around) params.set("around", around)
+  return apiFetch<MessageListResponse>(
+    `/conversations/${id}/messages?${params.toString()}`
+  )
+}
+
+export async function searchMemories(
+  query: string,
+  page = 1,
+  pageSize = 20
+): Promise<SearchResponse> {
+  const params = new URLSearchParams({
+    q: query,
+    page: String(page),
+    page_size: String(pageSize),
+    mode: "hybrid",
+  })
+  return apiFetch<SearchResponse>(`/search?${params.toString()}`)
+}
+
+export async function askJistory(
+  message: string,
+  conversationId?: string | null
+): Promise<AskResponse> {
+  return apiFetch<AskResponse>("/ask", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message,
+      conversation_id: conversationId || null,
+    }),
+  })
+}
+
+export async function getDashboard(): Promise<DashboardResponse> {
+  return apiFetch<DashboardResponse>("/dashboard")
+}
+
+export async function getSettings(): Promise<UserSettings> {
+  return apiFetch<UserSettings>("/settings")
+}
+
+export async function updateSettings(
+  payload: Partial<{
+    gemini_model: string
+    gemini_api_key: string
+    retrieval_limit: number
+    embedding_provider: string
+  }>
+): Promise<UserSettings> {
+  return apiFetch<UserSettings>("/settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+}
+
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
   try {
-    response = await fetch(getApiUrl(`/import/${importId}/parse`), {
-      method: "POST",
-    })
+    response = await fetch(getApiUrl(path), init)
   } catch {
     throw new Error(
       "Server unavailable. Check that the backend is running on port 8000."
@@ -135,11 +247,11 @@ export async function parseImportJob(importId: string): Promise<ParseJobSuccess>
     throw new Error(
       errorPayload?.error ||
         mapStatusToMessage(response.status) ||
-        "Failed to parse import."
+        "Request failed."
     )
   }
 
-  return payload as ParseJobSuccess
+  return payload as T
 }
 
 function mapStatusToMessage(status: number): string | null {
@@ -147,9 +259,11 @@ function mapStatusToMessage(status: number): string | null {
     case 413:
       return "File is too large for import."
     case 400:
-      return "Invalid ChatGPT export ZIP."
+      return "That request could not be completed."
     case 404:
-      return "Import job was not found."
+      return "The requested item was not found."
+    case 502:
+      return "Jistory could not reach Gemini. Check Settings."
     case 503:
       return "Server unavailable. Please try again."
     default:

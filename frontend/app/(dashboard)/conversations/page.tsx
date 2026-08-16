@@ -1,10 +1,5 @@
-import { PagePlaceholder } from "@/components/layout/page-placeholder"
+import { ConversationBrowser } from "@/components/conversations/conversation-browser"
 
 export default function ConversationsPage() {
-  return (
-    <PagePlaceholder
-      title="Conversations"
-      description="Browse and search your stored conversations. Coming soon."
-    />
-  )
+  return <ConversationBrowser />
 }

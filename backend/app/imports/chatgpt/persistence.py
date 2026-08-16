@@ -1,4 +1,4 @@
-"""Persist parsed ChatGPT conversations into SQLite."""
+"""Persist parsed conversations into SQLite with source-level idempotency."""
 
 from __future__ import annotations
 
@@ -8,7 +8,9 @@ import uuid
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
-from app.imports.chatgpt.parser import ParsedConversation, iter_conversation_batches
+from app.imports.chatgpt.parser import iter_conversation_batches
+from app.imports.parsers.base import ParsedConversation
+from app.models.chunk import MemoryChunk
 from app.models.conversation import Conversation
 from app.models.message import Message
 
@@ -19,27 +21,28 @@ CONVERSATION_BATCH_SIZE = 100
 
 
 def delete_import_conversations(db: Session, import_job_id: str) -> int:
-    """Remove previously stored conversations for an import job (idempotent re-parse)."""
+    """Remove previously stored conversations that still belong to this import job."""
     existing_ids = db.scalars(
         select(Conversation.id).where(Conversation.import_job_id == import_job_id)
     ).all()
     if not existing_ids:
         return 0
 
-    # Clear self-referential parents, then delete messages, then conversations.
+    _delete_conversation_ids(db, list(existing_ids))
+    logger.info("Cleared %d existing conversation(s) for import %s", len(existing_ids), import_job_id)
+    return len(existing_ids)
+
+
+def _delete_conversation_ids(db: Session, conversation_ids: list[str]) -> None:
     db.execute(
         update(Message)
-        .where(Message.conversation_id.in_(existing_ids))
+        .where(Message.conversation_id.in_(conversation_ids))
         .values(parent_message_id=None)
     )
-    db.execute(delete(Message).where(Message.conversation_id.in_(existing_ids)))
-    result = db.execute(
-        delete(Conversation).where(Conversation.import_job_id == import_job_id)
-    )
+    db.execute(delete(MemoryChunk).where(MemoryChunk.conversation_id.in_(conversation_ids)))
+    db.execute(delete(Message).where(Message.conversation_id.in_(conversation_ids)))
+    db.execute(delete(Conversation).where(Conversation.id.in_(conversation_ids)))
     db.flush()
-    deleted = result.rowcount or len(existing_ids)
-    logger.info("Cleared %d existing conversation(s) for import %s", deleted, import_job_id)
-    return deleted
 
 
 def persist_conversations(
@@ -52,60 +55,86 @@ def persist_conversations(
     """
     Persist parsed conversations/messages in batches.
 
+    Conversations are unique on (source, external_id) so importing the same
+    export twice updates existing rows instead of duplicating them.
+
     Returns (conversations_saved, messages_saved).
     """
     conversations_saved = 0
     messages_saved = 0
-
-    # (message_id, parent_message_id) updates applied after base rows exist.
-    parent_links: list[tuple[str, str]] = []
     pending_messages: list[Message] = []
 
     for batch in iter_conversation_batches(conversations, CONVERSATION_BATCH_SIZE):
-        for parsed in batch:
-            conversation_id = str(uuid.uuid4())
-            db.add(
-                Conversation(
-                    id=conversation_id,
-                    external_id=parsed.external_id,
-                    import_job_id=import_job_id,
-                    title=parsed.title,
-                    source=source,
-                    created_at=parsed.created_at,
-                    updated_at=parsed.updated_at,
-                    message_count=parsed.message_count,
-                    first_message_at=parsed.first_message_at,
-                    last_message_at=parsed.last_message_at,
-                )
+        external_ids = [parsed.external_id for parsed in batch]
+        existing_rows = db.scalars(
+            select(Conversation).where(
+                Conversation.source == source,
+                Conversation.external_id.in_(external_ids),
             )
-            conversations_saved += 1
+        ).all()
+        existing_by_external = {row.external_id: row for row in existing_rows}
 
+        reuse_ids = [row.id for row in existing_rows]
+        if reuse_ids:
+            db.execute(
+                update(Message)
+                .where(Message.conversation_id.in_(reuse_ids))
+                .values(parent_message_id=None)
+            )
+            db.execute(delete(MemoryChunk).where(MemoryChunk.conversation_id.in_(reuse_ids)))
+            db.execute(delete(Message).where(Message.conversation_id.in_(reuse_ids)))
+            db.flush()
+
+        for parsed in batch:
+            existing = existing_by_external.get(parsed.external_id)
+            conversation_id = existing.id if existing else str(uuid.uuid4())
+
+            if existing:
+                existing.import_job_id = import_job_id
+                existing.title = parsed.title
+                existing.created_at = parsed.created_at
+                existing.updated_at = parsed.updated_at
+                existing.message_count = parsed.message_count
+                existing.first_message_at = parsed.first_message_at
+                existing.last_message_at = parsed.last_message_at
+            else:
+                db.add(
+                    Conversation(
+                        id=conversation_id,
+                        external_id=parsed.external_id,
+                        import_job_id=import_job_id,
+                        title=parsed.title,
+                        source=source,
+                        created_at=parsed.created_at,
+                        updated_at=parsed.updated_at,
+                        message_count=parsed.message_count,
+                        first_message_at=parsed.first_message_at,
+                        last_message_at=parsed.last_message_at,
+                    )
+                )
+
+            db.flush()
+            conversations_saved += 1
             external_to_internal: dict[str, str] = {}
+            for parsed_msg in parsed.messages:
+                external_to_internal[parsed_msg.external_id] = str(uuid.uuid4())
 
             for parsed_msg in parsed.messages:
-                message_id = str(uuid.uuid4())
-                external_to_internal[parsed_msg.external_id] = message_id
+                parent_id = None
+                if parsed_msg.parent_external_id:
+                    parent_id = external_to_internal.get(parsed_msg.parent_external_id)
                 pending_messages.append(
                     Message(
-                        id=message_id,
+                        id=external_to_internal[parsed_msg.external_id],
                         conversation_id=conversation_id,
                         external_id=parsed_msg.external_id,
-                        parent_message_id=None,
+                        parent_message_id=None if not parent_id else parent_id,
                         role=parsed_msg.role,
                         content=parsed_msg.content or "",
                         created_at=parsed_msg.created_at,
                         sequence_number=parsed_msg.sequence_number,
                     )
                 )
-
-            for parsed_msg in parsed.messages:
-                parent_ext = parsed_msg.parent_external_id
-                if not parent_ext:
-                    continue
-                parent_id = external_to_internal.get(parent_ext)
-                child_id = external_to_internal.get(parsed_msg.external_id)
-                if parent_id and child_id:
-                    parent_links.append((child_id, parent_id))
 
             messages_saved += len(parsed.messages)
 
@@ -118,17 +147,6 @@ def persist_conversations(
 
     if pending_messages:
         db.add_all(pending_messages)
-        db.flush()
-
-    # Apply parent links in chunks after all message rows exist.
-    for i in range(0, len(parent_links), MESSAGE_FLUSH_SIZE):
-        chunk = parent_links[i : i + MESSAGE_FLUSH_SIZE]
-        for child_id, parent_id in chunk:
-            db.execute(
-                update(Message)
-                .where(Message.id == child_id)
-                .values(parent_message_id=parent_id)
-            )
         db.flush()
 
     logger.info(

@@ -4,55 +4,15 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
 from app.imports.chatgpt.content import extract_message_text, normalize_role
+from app.imports.parsers.base import ParsedConversation, ParsedMessage, ParseResult
 from app.imports.validators import is_chatgpt_conversation_file
 
 logger = logging.getLogger("jistory.parser")
-
-
-@dataclass
-class ParsedMessage:
-    external_id: str
-    parent_external_id: str | None
-    role: str
-    content: str
-    created_at: datetime | None
-    sequence_number: int
-
-
-@dataclass
-class ParsedConversation:
-    external_id: str
-    title: str | None
-    created_at: datetime | None
-    updated_at: datetime | None
-    messages: list[ParsedMessage] = field(default_factory=list)
-
-    @property
-    def message_count(self) -> int:
-        return len(self.messages)
-
-    @property
-    def first_message_at(self) -> datetime | None:
-        times = [m.created_at for m in self.messages if m.created_at is not None]
-        return min(times) if times else None
-
-    @property
-    def last_message_at(self) -> datetime | None:
-        times = [m.created_at for m in self.messages if m.created_at is not None]
-        return max(times) if times else None
-
-
-@dataclass
-class ParseResult:
-    conversations: list[ParsedConversation] = field(default_factory=list)
-    skipped: int = 0
-    warnings: list[str] = field(default_factory=list)
 
 
 def find_conversation_files(import_dir: Path) -> list[Path]:
@@ -151,6 +111,9 @@ def walk_active_path(mapping: dict[str, Any], current_node: str | None) -> list[
 
 def parse_conversation_node(raw: Any) -> ParsedConversation | None:
     if not isinstance(raw, dict):
+        return None
+
+    if raw.get("is_deleted") is True or raw.get("isDeleted") is True:
         return None
 
     external_id = (

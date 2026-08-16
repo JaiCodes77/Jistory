@@ -13,10 +13,24 @@ class ImportSource(str, enum.Enum):
 
 
 class ImportStatus(str, enum.Enum):
-    PENDING = "pending"
+    UPLOADED = "uploaded"
+    PROCESSING = "processing"
     COMPLETED = "completed"
-    PARSED = "parsed"
     FAILED = "failed"
+    # Legacy values kept so existing rows remain readable.
+    PENDING = "pending"
+    PARSED = "parsed"
+
+
+PARSEABLE_STATUSES = frozenset(
+    {
+        ImportStatus.UPLOADED.value,
+        ImportStatus.PROCESSING.value,
+        ImportStatus.COMPLETED.value,
+        ImportStatus.PENDING.value,
+        ImportStatus.PARSED.value,
+    }
+)
 
 
 class ImportJob(Base):

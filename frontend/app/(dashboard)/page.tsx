@@ -1,10 +1,5 @@
-import { PagePlaceholder } from "@/components/layout/page-placeholder"
+import { DashboardView } from "@/components/dashboard/dashboard-view"
 
 export default function DashboardPage() {
-  return (
-    <PagePlaceholder
-      title="Dashboard"
-      description="Overview of your conversation memory will appear here."
-    />
-  )
+  return <DashboardView />
 }

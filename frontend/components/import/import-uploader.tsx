@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useRef, useState } from "react"
+import Link from "next/link"
 import {
   AlertCircle,
   CheckCircle2,
@@ -387,11 +388,18 @@ export function ImportUploader() {
               <div>
                 <p className="font-medium">Ready for Search</p>
                 <p className="text-xs text-muted-foreground">
-                  Conversations are stored and available for future search
-                  features.
+                  Conversations are stored locally and available in Conversations,
+                  Search, and Ask Jistory.
                 </p>
               </div>
             </div>
+
+            <Link
+              href="/conversations"
+              className="inline-flex h-8 w-fit items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/80"
+            >
+              Browse conversations
+            </Link>
           </CardContent>
         </Card>
       )}

@@ -11,8 +11,11 @@ class Conversation(Base):
     __tablename__ = "conversations"
     __table_args__ = (
         UniqueConstraint("import_job_id", "external_id", name="uq_conversation_import_external"),
+        UniqueConstraint("source", "external_id", name="uq_conversation_source_external"),
         Index("ix_conversations_import_job_id", "import_job_id"),
         Index("ix_conversations_created_at", "created_at"),
+        Index("ix_conversations_updated_at", "updated_at"),
+        Index("ix_conversations_source", "source"),
     )
 
     id: Mapped[str] = mapped_column(

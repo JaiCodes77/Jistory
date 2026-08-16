@@ -15,6 +15,7 @@ backend/__pycache__/
 backend/**/__pycache__/
 backend/*.py[cod]
 backend/.pytest_cache/
+.pytest_cache/
 backend/.ruff_cache/
 backend/data/
 backend/*.db

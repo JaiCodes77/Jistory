@@ -53,8 +53,10 @@ class ImportService:
 
             extracted = extract_zip(zip_path, import_dir)
 
-            # Keep the original ZIP alongside extracted files for auditing.
-            relative_folder = str(import_dir.relative_to(DATA_DIR))
+            try:
+                relative_folder = str(import_dir.relative_to(DATA_DIR))
+            except ValueError:
+                relative_folder = str(import_dir)
             notes = (
                 f"Extracted {len(extracted)} file(s). "
                 f"Conversation files: {', '.join(conversation_files)}."
@@ -64,7 +66,7 @@ class ImportService:
                 source=ImportSource.CHATGPT.value,
                 imported_at=datetime.now(timezone.utc),
                 folder_path=relative_folder,
-                status=ImportStatus.COMPLETED.value,
+                status=ImportStatus.UPLOADED.value,
                 file_size=len(data),
                 original_filename=filename,
                 notes=notes,

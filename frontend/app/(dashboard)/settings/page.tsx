@@ -1,10 +1,5 @@
-import { PagePlaceholder } from "@/components/layout/page-placeholder"
+import { SettingsForm } from "@/components/settings/settings-form"
 
 export default function SettingsPage() {
-  return (
-    <PagePlaceholder
-      title="Settings"
-      description="Configure Jistory preferences. Coming soon."
-    />
-  )
+  return <SettingsForm />
 }

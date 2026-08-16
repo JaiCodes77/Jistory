@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = BACKEND_DIR / "data"
 IMPORTS_DIR = DATA_DIR / "imports"
+SETTINGS_PATH = DATA_DIR / "settings.json"
 
 
 class Settings(BaseSettings):
@@ -17,19 +18,27 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Jistory"
-    app_version: str = "0.1.0"
+    app_version: str = "1.0.0"
     debug: bool = True
     api_prefix: str = "/api"
 
-    # Comma-separated origins, e.g. "http://localhost:3000"
     cors_origins: str = "http://localhost:3000"
 
     database_url: str = f"sqlite:///{DATA_DIR / 'jistory.db'}"
 
-    # Maximum ChatGPT export ZIP size (MB)
     max_import_size_mb: int = 500
-
     imports_dir: str = str(IMPORTS_DIR)
+
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
+    llm_timeout_seconds: int = 60
+    llm_max_retries: int = 2
+
+    embedding_provider: str = "local"
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
+
+    retrieval_limit: int = 8
+    ask_max_history_turns: int = 8
 
     @property
     def cors_origins_list(self) -> list[str]:

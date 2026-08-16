@@ -1,12 +1,15 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api import api_router
 from app.core.config import get_settings
+from app.core.errors import AppError
 from app.db.session import init_db
+from app.schemas.import_job import ImportErrorResponse
 
 
 def _configure_logging() -> None:
@@ -14,7 +17,6 @@ def _configure_logging() -> None:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
-    # Keep SQLAlchemy quieter during large parses.
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
 
@@ -41,6 +43,13 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.exception_handler(AppError)
+    async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=ImportErrorResponse(error=exc.message, code=exc.code).model_dump(),
+        )
 
     app.include_router(api_router, prefix=settings.api_prefix)
 

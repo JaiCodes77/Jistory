@@ -8,4 +8,5 @@ class ParseJobResponse(BaseModel):
     messages: int
     skipped: int
     elapsed: str
-    status: str = "parsed"
+    elapsed_ms: int = 0
+    status: str = "completed"
