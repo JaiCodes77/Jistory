@@ -11,6 +11,7 @@ import type {
 import type {
   ImportJobError,
   ImportJobSuccess,
+  ImportStatusResponse,
   ParseJobSuccess,
 } from "@/types/import"
 
@@ -137,6 +138,10 @@ export async function parseImportJob(importId: string): Promise<ParseJobSuccess>
   return apiFetch<ParseJobSuccess>(`/import/${importId}/parse`, { method: "POST" })
 }
 
+export async function getImportJob(importId: string): Promise<ImportStatusResponse> {
+  return apiFetch<ImportStatusResponse>(`/import/${importId}`)
+}
+
 export async function listConversations(
   filters: Partial<ConversationFilters>
 ): Promise<ConversationListResponse> {
@@ -162,13 +167,17 @@ export async function getConversationMessages(
   id: string,
   page = 1,
   pageSize = 80,
-  around?: string
+  around?: string,
+  before?: number,
+  after?: number
 ): Promise<MessageListResponse> {
   const params = new URLSearchParams({
     page: String(page),
     page_size: String(pageSize),
   })
   if (around) params.set("around", around)
+  if (before != null) params.set("before", String(before))
+  if (after != null) params.set("after", String(after))
   return apiFetch<MessageListResponse>(
     `/conversations/${id}/messages?${params.toString()}`
   )
@@ -262,8 +271,12 @@ function mapStatusToMessage(status: number): string | null {
       return "That request could not be completed."
     case 404:
       return "The requested item was not found."
+    case 429:
+      return "Gemini is rate-limited. Please wait and try again."
     case 502:
       return "Jistory could not reach Gemini. Check Settings."
+    case 504:
+      return "Gemini timed out. Please try again."
     case 503:
       return "Server unavailable. Please try again."
     default:

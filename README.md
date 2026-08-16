@@ -40,6 +40,8 @@ Frontend and backend stay separate. Provider integrations are abstracted (`Conve
 
 ## Local setup
 
+Use **Python 3.11–3.13**. Python 3.14 is not supported yet (SQLAlchemy). The backend pins 3.12 via `backend/.python-version`.
+
 ### Backend
 
 ```bash
@@ -77,6 +79,8 @@ RETRIEVAL_LIMIT=8
 CORS_ORIGINS=http://localhost:3000
 ```
 
+`EMBEDDING_PROVIDER=hash` is tests-only. If FastEmbed is missing, indexing fails with a visible error instead of silently using hash embeddings. Keyword search still works after parse.
+
 Frontend:
 
 ```text
@@ -94,7 +98,9 @@ The Gemini API key can also be saved from Settings. That writes a local `setting
 5. Upload the ZIP.
 6. Click **Parse Conversations**.
 
-Exports are extracted under `backend/data/imports/<timestamp>/`. Parsing is idempotent: the same conversation is not duplicated if you import or parse the same export again.
+Parse stores conversations immediately, then indexes embeddings in a background thread. Import shows **Indexing embeddings** (including the first FastEmbed model download) until status is **Ready**. Keyword search works as soon as parse finishes.
+
+Exports are extracted under `backend/data/imports/<timestamp>/`. Parsing is idempotent: the same conversation is not duplicated if you import or parse the same export again. Existing SQLite databases get an additive unique index on `(source, external_id)` at startup; Jistory never deletes `backend/data/jistory.db` to apply schema changes.
 
 ## Asking Jistory questions
 
@@ -120,6 +126,15 @@ Conversation content is not written to application logs. Imported files are not 
 
 - `/` focuses global search when you are not typing in an input
 - `⌘K` / `Ctrl+K` opens global search
+- Enter in the palette opens the Search page at `/search`
+
+## Schema
+
+Startup uses SQLAlchemy `create_all` plus additive `ensure_runtime_schema` (new columns and the conversation unique index). That is the source of truth for the local SQLite file.
+
+```bash
+uv run alembic upgrade head   # optional; same additive helpers, never drops the DB
+```
 
 ## Development commands
 
@@ -130,7 +145,7 @@ uv sync --group dev
 uv run uvicorn app.main:app --reload --port 8000
 uv run pytest
 uv run ruff check app tests
-uv run alembic upgrade head   # optional; startup also creates tables
+uv run alembic upgrade head   # optional; startup also creates tables and additive indexes
 
 # frontend
 cd frontend

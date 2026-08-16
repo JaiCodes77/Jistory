@@ -2,15 +2,17 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { LoaderCircle, Search } from "lucide-react"
 
 import { conversationTitle, formatDate, searchMemories } from "@/lib/api"
+import { isEditableTarget } from "@/lib/keyboard"
 import type { SearchHit } from "@/types/api"
 import { cn } from "@/lib/utils"
 
 export function CommandSearch() {
   const pathname = usePathname()
+  const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
@@ -28,11 +30,7 @@ export function CommandSearch() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null
-      const typing =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.isContentEditable
+      const typing = isEditableTarget(event.target)
 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault()
@@ -103,6 +101,8 @@ export function CommandSearch() {
 
   if (!open) return null
 
+  const searchHref = `/search?q=${encodeURIComponent(query.trim())}`
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pt-[12vh]">
       <button
@@ -118,6 +118,13 @@ export function CommandSearch() {
             ref={inputRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && query.trim().length >= 2) {
+                event.preventDefault()
+                close()
+                router.push(searchHref)
+              }
+            }}
             placeholder="Search conversations and messages"
             className="h-11 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
@@ -160,8 +167,13 @@ export function CommandSearch() {
             </Link>
           ))}
         </div>
-        <div className="border-t border-border px-3 py-2 text-[11px] text-muted-foreground">
-          Enter a conversation to open it at the matching message.
+        <div className="flex items-center justify-between border-t border-border px-3 py-2 text-[11px] text-muted-foreground">
+          <span>Enter opens the search page. Conversations stay on this machine.</span>
+          {query.trim().length >= 2 && (
+            <Link href={searchHref} className="hover:text-foreground">
+              View all results
+            </Link>
+          )}
         </div>
       </div>
     </div>

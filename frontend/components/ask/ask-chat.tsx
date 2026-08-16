@@ -6,7 +6,7 @@ import { LoaderCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { askJistory, conversationTitle, formatDate, getDashboard } from "@/lib/api"
+import { askJistory, conversationTitle, formatDate, getDashboard, getSettings } from "@/lib/api"
 import type { SourceReference } from "@/types/api"
 import { cn } from "@/lib/utils"
 
@@ -23,12 +23,16 @@ export function AskChat() {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasMemories, setHasMemories] = useState<boolean | null>(null)
+  const [apiKeyConfigured, setApiKeyConfigured] = useState<boolean | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     void getDashboard()
       .then((data) => setHasMemories(data.total_conversations > 0))
       .catch(() => setHasMemories(null))
+    void getSettings()
+      .then((data) => setApiKeyConfigured(data.api_key_configured))
+      .catch(() => setApiKeyConfigured(null))
   }, [])
 
   useEffect(() => {
@@ -81,6 +85,18 @@ export function AskChat() {
             className="mt-4 inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-sm hover:bg-muted"
           >
             Import conversations
+          </Link>
+        </div>
+      )}
+
+      {apiKeyConfigured === false && hasMemories !== false && (
+        <div className="mb-4 rounded-xl border border-border px-4 py-3 text-sm">
+          <p className="font-medium">Gemini is not configured.</p>
+          <p className="mt-1 text-muted-foreground">
+            Add GEMINI_API_KEY in Settings or your backend .env file to generate answers.
+          </p>
+          <Link href="/settings" className="mt-2 inline-flex text-xs hover:underline">
+            Open Settings
           </Link>
         </div>
       )}

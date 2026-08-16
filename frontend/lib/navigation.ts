@@ -37,6 +37,11 @@ export const mainNav: NavItem[] = [
 ]
 
 export function getPageTitle(pathname: string): string {
+  if (pathname.startsWith("/search")) return "Search"
+  if (pathname.startsWith("/conversations/") && pathname !== "/conversations") {
+    return "Conversation"
+  }
+
   const exact = mainNav.find((item) => item.href === pathname)
   if (exact) return exact.title
 

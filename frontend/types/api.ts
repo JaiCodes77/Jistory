@@ -31,6 +31,8 @@ export type MessageListResponse = {
   page_size: number
   total: number
   conversation: ConversationSummary
+  has_before: boolean
+  has_after: boolean
 }
 
 export type SearchHit = {
@@ -100,6 +102,8 @@ export type UserSettings = {
   retrieval_limit: number
   stored_locally: boolean
   sent_to_gemini_on_ask: boolean
+  embedding_status: string
+  embedding_status_detail: string
 }
 
 export type ConversationFilters = {

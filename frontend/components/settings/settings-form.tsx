@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getSettings, updateSettings } from "@/lib/api"
+import { formatEmbeddingStatus } from "@/lib/labels"
 import type { UserSettings } from "@/types/api"
 
 export function SettingsForm() {
@@ -31,6 +32,16 @@ export function SettingsForm() {
       )
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (settings?.embedding_status !== "downloading") return
+    const handle = window.setInterval(() => {
+      void getSettings()
+        .then(setSettings)
+        .catch(() => undefined)
+    }, 1500)
+    return () => window.clearInterval(handle)
+  }, [settings?.embedding_status])
 
   const save = async () => {
     setSaving(true)
@@ -133,6 +144,14 @@ export function SettingsForm() {
           Embedding provider: {settings?.embedding_provider} ({settings?.embedding_model}).
           Conversation text is embedded locally by default.
         </p>
+        {settings?.embedding_status && (
+          <p className="text-xs text-muted-foreground">
+            {formatEmbeddingStatus(settings.embedding_status)}
+            {settings.embedding_status_detail
+              ? ` — ${settings.embedding_status_detail}`
+              : ""}
+          </p>
+        )}
       </section>
 
       <section className="rounded-xl border border-border bg-card p-4 text-sm">

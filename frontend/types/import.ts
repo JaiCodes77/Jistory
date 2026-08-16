@@ -27,6 +27,18 @@ export type ParseJobSuccess = {
   elapsed: string
   elapsed_ms?: number
   status: string
+  chunks_indexed?: number | null
+  index_error?: string | null
+}
+
+export type ImportStatusResponse = ImportJobSuccess & {
+  conversations?: number | null
+  messages?: number | null
+  skipped?: number | null
+  chunks_indexed?: number | null
+  index_error?: string | null
+  embedding_status?: string | null
+  embedding_status_detail?: string | null
 }
 
 export type UploadState =

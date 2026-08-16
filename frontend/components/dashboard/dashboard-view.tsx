@@ -6,6 +6,7 @@ import { LoaderCircle } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { conversationTitle, formatDate, formatImportedAt, getDashboard } from "@/lib/api"
+import { formatImportStatus } from "@/lib/labels"
 import type { DashboardResponse } from "@/types/api"
 
 export function DashboardView() {
@@ -81,7 +82,7 @@ export function DashboardView() {
             {formatImportedAt(data.latest_import.imported_at)}
           </p>
           <p className="text-xs text-muted-foreground">
-            {data.latest_import.status}
+            {formatImportStatus(data.latest_import.status)}
             {data.latest_import.conversations != null
               ? ` · ${data.latest_import.conversations.toLocaleString()} conversations`
               : ""}

@@ -21,16 +21,21 @@ import {
 import {
   formatBytes,
   formatImportedAt,
+  getImportJob,
   parseImportJob,
   uploadChatGPTExport,
 } from "@/lib/api"
+import { formatImportStatus } from "@/lib/labels"
 import { cn } from "@/lib/utils"
 import type {
   ImportJobSuccess,
+  ImportStatusResponse,
   ParseJobSuccess,
   ParseState,
   UploadState,
 } from "@/types/import"
+
+const INDEX_POLL_MS = 900
 
 export function ImportUploader() {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -44,6 +49,7 @@ export function ImportUploader() {
   const [parseState, setParseState] = useState<ParseState>("idle")
   const [parseError, setParseError] = useState<string | null>(null)
   const [parseResult, setParseResult] = useState<ParseJobSuccess | null>(null)
+  const [indexStatus, setIndexStatus] = useState<ImportStatusResponse | null>(null)
 
   const resetSelection = useCallback(() => {
     setFile(null)
@@ -54,6 +60,7 @@ export function ImportUploader() {
     setParseState("idle")
     setParseError(null)
     setParseResult(null)
+    setIndexStatus(null)
     if (inputRef.current) {
       inputRef.current.value = ""
     }
@@ -66,6 +73,7 @@ export function ImportUploader() {
       setFile(null)
       setResult(null)
       setParseResult(null)
+      setIndexStatus(null)
       setProgress(0)
       setState("error")
       setError("Please select a ChatGPT export ZIP file (.zip).")
@@ -75,6 +83,7 @@ export function ImportUploader() {
     setFile(next)
     setResult(null)
     setParseResult(null)
+    setIndexStatus(null)
     setParseState("idle")
     setParseError(null)
     setError(null)
@@ -104,6 +113,7 @@ export function ImportUploader() {
     setParseState("idle")
     setParseError(null)
     setParseResult(null)
+    setIndexStatus(null)
 
     try {
       const response = await uploadChatGPTExport({
@@ -123,19 +133,39 @@ export function ImportUploader() {
     }
   }
 
+  const pollIndex = async (importId: string) => {
+    for (let attempt = 0; attempt < 600; attempt += 1) {
+      const status = await getImportJob(importId)
+      setIndexStatus(status)
+      setResult((prev) => (prev ? { ...prev, status: status.status } : prev))
+      if (
+        status.status === "ready" ||
+        status.status === "completed" ||
+        status.status === "parsed" ||
+        status.status === "failed"
+      ) {
+        return status
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, INDEX_POLL_MS))
+    }
+    throw new Error("Indexing is taking too long. Keyword search may already work.")
+  }
+
   const startParse = async () => {
     if (!result?.importId || parseState === "parsing") return
 
     setParseState("parsing")
     setParseError(null)
+    setIndexStatus(null)
 
     try {
       const response = await parseImportJob(result.importId)
       setParseResult(response)
-      setParseState("success")
       setResult((prev) =>
         prev ? { ...prev, status: response.status } : prev
       )
+      setParseState("success")
+      await pollIndex(result.importId)
     } catch (err) {
       const message =
         err instanceof Error
@@ -145,6 +175,15 @@ export function ImportUploader() {
       setParseState("error")
     }
   }
+
+  const currentStatus = indexStatus?.status || parseResult?.status || result?.status
+  const indexing =
+    parseState === "success" &&
+    (currentStatus === "indexing" || currentStatus === "processing")
+  const indexError = indexStatus?.index_error
+  const ready =
+    currentStatus === "ready" || currentStatus === "completed"
+  const keywordReady = ready || currentStatus === "parsed"
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-10">
@@ -199,7 +238,7 @@ export function ImportUploader() {
               type="button"
               variant="outline"
               size="sm"
-              disabled={state === "uploading" || parseState === "parsing"}
+              disabled={state === "uploading" || parseState === "parsing" || indexing}
               onClick={() => inputRef.current?.click()}
             >
               Select ZIP
@@ -224,7 +263,7 @@ export function ImportUploader() {
                   </p>
                 </div>
               </div>
-              {state !== "uploading" && parseState !== "parsing" && (
+              {state !== "uploading" && parseState !== "parsing" && !indexing && (
                 <Button
                   type="button"
                   variant="ghost"
@@ -272,7 +311,7 @@ export function ImportUploader() {
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              disabled={!file || state === "uploading" || parseState === "parsing"}
+              disabled={!file || state === "uploading" || parseState === "parsing" || indexing}
               onClick={startUpload}
             >
               {state === "uploading" ? "Uploading…" : "Upload export"}
@@ -281,7 +320,7 @@ export function ImportUploader() {
               <Button
                 type="button"
                 variant="outline"
-                disabled={parseState === "parsing"}
+                disabled={parseState === "parsing" || indexing}
                 onClick={resetSelection}
               >
                 Import another
@@ -310,7 +349,7 @@ export function ImportUploader() {
                 label="Imported at"
                 value={formatImportedAt(result.importedAt)}
               />
-              <SummaryItem label="Status" value={result.status} />
+              <SummaryItem label="Status" value={formatImportStatus(currentStatus)} />
               <SummaryItem label="Source" value={result.source} />
               <SummaryItem label="Import ID" value={result.importId} mono />
             </dl>
@@ -321,6 +360,7 @@ export function ImportUploader() {
                   <p className="text-sm font-medium">Next step</p>
                   <p className="text-xs text-muted-foreground">
                     Parse the export into normalized conversations and messages.
+                    Embeddings index in the background after parse.
                   </p>
                 </div>
 
@@ -383,16 +423,43 @@ export function ImportUploader() {
               </p>
             )}
 
-            <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-sm">
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-foreground" />
-              <div>
-                <p className="font-medium">Ready for Search</p>
-                <p className="text-xs text-muted-foreground">
-                  Conversations are stored locally and available in Conversations,
-                  Search, and Ask Jistory.
-                </p>
+            {indexing && (
+              <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-sm">
+                <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin" />
+                <div>
+                  <p className="font-medium">Indexing embeddings</p>
+                  <p className="text-xs text-muted-foreground">
+                    {indexStatus?.embedding_status === "downloading"
+                      ? indexStatus.embedding_status_detail ||
+                        "Downloading the local embedding model (first run)…"
+                      : "Keyword search is already available. Semantic search will turn on when indexing finishes."}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
+
+            {indexError && (
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <p>{indexError}</p>
+              </div>
+            )}
+
+            {keywordReady && !indexing && (
+              <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-sm">
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-foreground" />
+                <div>
+                  <p className="font-medium">
+                    {ready ? "Ready for Search and Ask" : "Ready for keyword search"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {ready
+                      ? "Conversations are stored locally with keyword and semantic indexes."
+                      : "Conversations are stored locally. Semantic indexing did not finish, but Search still works."}
+                  </p>
+                </div>
+              </div>
+            )}
 
             <Link
               href="/conversations"
