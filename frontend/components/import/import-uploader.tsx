@@ -18,6 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { ShareLinkImporter } from "@/components/import/share-link-importer"
 import {
   formatBytes,
   formatImportedAt,
@@ -190,16 +191,19 @@ export function ImportUploader() {
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-medium tracking-tight">Import</h2>
         <p className="text-sm text-muted-foreground">
-          Upload a ChatGPT data export ZIP, then parse conversations into
-          Jistory.
+          Paste a ChatGPT share link to import one chat now, or upload a data
+          export ZIP when it arrives.
         </p>
       </div>
+
+      <ShareLinkImporter />
 
       <Card className="border-border bg-card shadow-none">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium">ChatGPT export</CardTitle>
           <CardDescription>
-            Export from ChatGPT → Settings → Data controls → Export data.
+            Full history still uses ChatGPT → Settings → Data controls → Export
+            data. That ZIP can take a while to arrive.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">

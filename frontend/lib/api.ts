@@ -138,6 +138,14 @@ export async function parseImportJob(importId: string): Promise<ParseJobSuccess>
   return apiFetch<ParseJobSuccess>(`/import/${importId}/parse`, { method: "POST" })
 }
 
+export async function importChatGPTShare(url: string): Promise<ParseJobSuccess> {
+  return apiFetch<ParseJobSuccess>("/import/chatgpt/share", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  })
+}
+
 export async function getImportJob(importId: string): Promise<ImportStatusResponse> {
   return apiFetch<ImportStatusResponse>(`/import/${importId}`)
 }

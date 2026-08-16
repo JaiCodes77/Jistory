@@ -7,9 +7,10 @@ from app.db.session import get_db
 from app.embeddings.runtime import get_embedding_status
 from app.imports.parse_service import ParseService
 from app.imports.service import ImportService
+from app.imports.share_service import ShareImportService
 from app.imports.validators import ImportValidationError
 from app.models.import_job import ImportJob
-from app.schemas.import_job import ImportErrorResponse, ImportJobResponse
+from app.schemas.import_job import ImportErrorResponse, ImportJobResponse, ShareImportRequest
 from app.schemas.parse import ParseJobResponse
 
 router = APIRouter(prefix="/import", tags=["import"])
@@ -72,6 +73,40 @@ async def import_chatgpt_export(
             status_code=503,
             content=ImportErrorResponse(
                 error="Server unavailable or failed to process the upload. Please try again.",
+                code="server_unavailable",
+            ).model_dump(),
+        )
+
+
+@router.post(
+    "/chatgpt/share",
+    response_model=ParseJobResponse,
+    responses={
+        400: {"model": ImportErrorResponse},
+        404: {"model": ImportErrorResponse},
+        503: {"model": ImportErrorResponse},
+    },
+)
+def import_chatgpt_share(
+    payload: ShareImportRequest,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ParseJobResponse | JSONResponse:
+    """Fetch a public ChatGPT share page and store that conversation locally."""
+    service = ShareImportService(db=db, settings=settings)
+    try:
+        return service.import_share_url(payload.url)
+    except ImportValidationError as exc:
+        status_code = 404 if exc.code in {"share_not_found", "import_not_found"} else 400
+        return JSONResponse(
+            status_code=status_code,
+            content=ImportErrorResponse(error=exc.message, code=exc.code).model_dump(),
+        )
+    except Exception:
+        return JSONResponse(
+            status_code=503,
+            content=ImportErrorResponse(
+                error="Server unavailable or failed to import the share link. Please try again.",
                 code="server_unavailable",
             ).model_dump(),
         )

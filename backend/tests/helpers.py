@@ -4,6 +4,7 @@ import io
 import json
 import zipfile
 from pathlib import Path
+from typing import Any
 
 
 def chatgpt_conversation(
@@ -86,3 +87,38 @@ def write_export_dir(path: Path, conversations: list[dict]) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     (path / "conversations.json").write_text(json.dumps(conversations), encoding="utf-8")
     return path
+
+
+def share_html_for(conversation: dict[str, Any], *, legacy: bool = False) -> str:
+    """Minimal ChatGPT share page wrapping a conversation payload."""
+    if legacy:
+        next_data = {
+            "props": {
+                "pageProps": {
+                    "serverResponse": {"data": conversation},
+                }
+            }
+        }
+        return (
+            "<!doctype html><html><body>"
+            f'<script id="__NEXT_DATA__" type="application/json">{json.dumps(next_data)}</script>'
+            "</body></html>"
+        )
+
+    loader = [
+        {},
+        "loaderData",
+        {
+            "routes/share.$shareId.($action)": {
+                "sharedConversationId": conversation.get("conversation_id")
+                or conversation.get("id"),
+                "serverResponse": {"data": conversation},
+            }
+        },
+    ]
+    argument = json.dumps(json.dumps(loader) + "\n")
+    return (
+        "<!doctype html><html><body>"
+        f"<script>window.__reactRouterContext.streamController.enqueue({argument});</script>"
+        "</body></html>"
+    )

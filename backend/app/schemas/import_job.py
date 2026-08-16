@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ImportJobResponse(BaseModel):
@@ -28,3 +28,7 @@ class ImportErrorResponse(BaseModel):
     success: bool = False
     error: str
     code: str
+
+
+class ShareImportRequest(BaseModel):
+    url: str = Field(..., min_length=8, max_length=2048)

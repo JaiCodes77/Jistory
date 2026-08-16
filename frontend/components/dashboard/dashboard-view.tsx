@@ -42,7 +42,7 @@ export function DashboardView() {
         <h2 className="text-lg font-medium tracking-tight">Welcome to Jistory</h2>
         <p className="text-sm text-muted-foreground">
           Import your ChatGPT history to build a searchable long-term memory of your
-          conversations.
+          conversations. Paste a share link or upload an export ZIP.
         </p>
         <Link
           href="/import"
