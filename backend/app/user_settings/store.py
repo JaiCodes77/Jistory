@@ -5,10 +5,11 @@ import logging
 from pathlib import Path
 
 from app.core.config import SETTINGS_PATH, Settings, get_settings
+from app.embeddings.runtime import get_embedding_status
 
 logger = logging.getLogger("jistory.settings")
 
-ALLOWED_EMBEDDING_PROVIDERS = {"local", "gemini", "hash"}
+ALLOWED_EMBEDDING_PROVIDERS = {"local", "gemini"}
 
 
 def _read_file(path: Path) -> dict:
@@ -73,6 +74,7 @@ def resolve_settings(settings: Settings) -> Settings:
 
 def public_settings(settings: Settings) -> dict:
     resolved = resolve_settings(settings)
+    embedding = get_embedding_status()
     return {
         "llm_provider": "gemini",
         "gemini_model": resolved.gemini_model,
@@ -82,4 +84,6 @@ def public_settings(settings: Settings) -> dict:
         "retrieval_limit": resolved.retrieval_limit,
         "stored_locally": True,
         "sent_to_gemini_on_ask": True,
+        "embedding_status": embedding["status"],
+        "embedding_status_detail": embedding["detail"],
     }

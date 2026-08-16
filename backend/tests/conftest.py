@@ -25,5 +25,8 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     with TestClient(create_app()) as test_client:
         yield test_client
 
+    from app.embeddings.jobs import wait_for_background_jobs
+
+    wait_for_background_jobs()
     reset_engine()
     get_settings.cache_clear()

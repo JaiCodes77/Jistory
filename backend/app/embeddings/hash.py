@@ -9,9 +9,10 @@ DIM = 384
 
 
 class HashEmbeddingProvider(EmbeddingProvider):
-    """Deterministic local embeddings for tests and as a last-resort fallback.
+    """Deterministic local embeddings for tests only.
 
-    This is not a semantic model. Production should use LocalEmbeddingProvider.
+    This is not a semantic model. Production uses LocalEmbeddingProvider and
+    must not fall back here.
     """
 
     model_name = "hash-384"

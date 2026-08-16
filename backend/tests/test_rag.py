@@ -6,6 +6,7 @@ from app.ask.service import ask
 from app.core.config import get_settings
 from app.db.session import get_session_factory
 from app.llm.base import ChatTurn, LLMProvider
+from app.llm.gemini import map_gemini_exception
 from tests.helpers import chatgpt_conversation, export_zip
 
 
@@ -107,6 +108,25 @@ def test_ask_without_memories(client: TestClient) -> None:
         db.close()
     assert "memories yet" in result.answer.lower()
     assert result.sources == []
+
+
+def test_gemini_errors_are_user_facing() -> None:
+    invalid = map_gemini_exception(RuntimeError("API key not valid. Please pass a valid API key."))
+    assert invalid.code == "invalid_api_key"
+    assert "traceback" not in invalid.message.lower()
+    timeout = map_gemini_exception(TimeoutError("deadline exceeded"))
+    assert timeout.code == "llm_timeout"
+    assert timeout.status_code == 504
+
+
+def test_ask_without_api_key_returns_user_error(client: TestClient) -> None:
+    _seed(client)
+    response = client.post("/api/ask", json={"message": "What conclusion did I reach about Grafana alerts?"})
+    assert response.status_code == 400
+    body = response.json()
+    assert body["code"] == "missing_api_key"
+    assert "GEMINI_API_KEY" in body["error"]
+    assert "traceback" not in body["error"].lower()
 
 
 def test_settings_does_not_expose_api_key(client: TestClient) -> None:

@@ -9,4 +9,6 @@ class ParseJobResponse(BaseModel):
     skipped: int
     elapsed: str
     elapsed_ms: int = 0
-    status: str = "completed"
+    status: str = "indexing"
+    chunks_indexed: int | None = None
+    index_error: str | None = None

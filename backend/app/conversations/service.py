@@ -106,22 +106,99 @@ def list_messages(
     page: int,
     page_size: int,
     around_message_id: str | None = None,
-) -> tuple[Conversation, list[Message], int, int]:
+    before_sequence: int | None = None,
+    after_sequence: int | None = None,
+) -> tuple[Conversation, list[Message], int, int, bool, bool]:
     conversation = get_conversation(db, conversation_id)
     total = conversation.message_count
+    base = select(Message).where(Message.conversation_id == conversation_id)
 
     if around_message_id:
         target = db.get(Message, around_message_id)
         if target is None or target.conversation_id != conversation_id:
             raise AppError("Message not found in this conversation.", code="not_found", status_code=404)
-        page = (target.sequence_number // page_size) + 1
+        seq = target.sequence_number
+        before = list(
+            db.scalars(
+                base.where(Message.sequence_number <= seq)
+                .order_by(Message.sequence_number.desc())
+                .limit(page_size // 2 + 1)
+            ).all()
+        )
+        after = list(
+            db.scalars(
+                base.where(Message.sequence_number > seq)
+                .order_by(Message.sequence_number.asc())
+                .limit(max(0, page_size - len(before)))
+            ).all()
+        )
+        items = list(reversed(before)) + after
+        if len(items) < page_size:
+            extra = list(
+                db.scalars(
+                    base.where(Message.sequence_number < items[0].sequence_number)
+                    .order_by(Message.sequence_number.desc())
+                    .limit(page_size - len(items))
+                ).all()
+            ) if items else []
+            items = list(reversed(extra)) + items
+        page = (seq // page_size) + 1 if page_size else 1
+    elif before_sequence is not None:
+        items = list(
+            reversed(
+                list(
+                    db.scalars(
+                        base.where(Message.sequence_number < before_sequence)
+                        .order_by(Message.sequence_number.desc())
+                        .limit(page_size)
+                    ).all()
+                )
+            )
+        )
+    elif after_sequence is not None:
+        items = list(
+            db.scalars(
+                base.where(Message.sequence_number > after_sequence)
+                .order_by(Message.sequence_number.asc())
+                .limit(page_size)
+            ).all()
+        )
+    else:
+        items = list(
+            db.scalars(
+                base.order_by(Message.sequence_number.asc())
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            ).all()
+        )
 
-    stmt = (
-        select(Message)
-        .where(Message.conversation_id == conversation_id)
-        .order_by(Message.sequence_number.asc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    )
-    items = list(db.scalars(stmt).all())
-    return conversation, items, total, page
+    has_before = False
+    has_after = False
+    if items:
+        has_before = (
+            db.scalar(
+                select(Message.id)
+                .where(
+                    Message.conversation_id == conversation_id,
+                    Message.sequence_number < items[0].sequence_number,
+                )
+                .limit(1)
+            )
+            is not None
+        )
+        has_after = (
+            db.scalar(
+                select(Message.id)
+                .where(
+                    Message.conversation_id == conversation_id,
+                    Message.sequence_number > items[-1].sequence_number,
+                )
+                .limit(1)
+            )
+            is not None
+        )
+    elif total > 0:
+        has_before = page > 1
+        has_after = True
+
+    return conversation, items, total, page, has_before, has_after

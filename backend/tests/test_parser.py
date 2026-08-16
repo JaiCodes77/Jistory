@@ -116,6 +116,16 @@ def test_reparse_same_job_is_idempotent(client: TestClient) -> None:
     assert client.get("/api/conversations").json()["total"] == 1
 
 
+def test_parse_resolves_folder_under_data_imports(client: TestClient) -> None:
+    payload = export_zip([chatgpt_conversation()])
+    uploaded = client.post("/api/import/chatgpt", files={"file": ("a.zip", payload, "application/zip")})
+    body = uploaded.json()
+    assert body["folder"]
+    parsed = client.post(f"/api/import/{body['importId']}/parse")
+    assert parsed.status_code == 200, parsed.text
+    assert parsed.json()["conversations"] == 1
+
+
 def test_parse_response_shape(client: TestClient) -> None:
     payload = export_zip([chatgpt_conversation()])
     uploaded = client.post("/api/import/chatgpt", files={"file": ("a.zip", payload, "application/zip")})
@@ -125,4 +135,4 @@ def test_parse_response_shape(client: TestClient) -> None:
     assert body["conversations"] == 1
     assert body["messages"] == 2
     assert "elapsed_ms" in body
-    assert body["status"] == "completed"
+    assert body["status"] in {"indexing", "parsed", "ready", "completed"}

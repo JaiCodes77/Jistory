@@ -25,7 +25,6 @@ def update_settings(
         None,
         "local",
         "gemini",
-        "hash",
     }:
         return JSONResponse(
             status_code=400,

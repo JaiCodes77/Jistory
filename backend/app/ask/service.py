@@ -108,9 +108,16 @@ def _retrieval_query(question: str, history: list[AskTurn]) -> str:
     if len(words) >= 8 or not history:
         return question
     prior = [turn.content for turn in history if turn.role == "user"][-2:]
-    if not prior:
-        return question
-    return " ".join([*prior, question])
+    last_assistant = next(
+        (turn.content for turn in reversed(history) if turn.role == "assistant"),
+        "",
+    )
+    assistant_hint = " ".join(last_assistant.split()[:40]).strip()
+    parts = [*prior]
+    if assistant_hint:
+        parts.append(assistant_hint)
+    parts.append(question)
+    return " ".join(part for part in parts if part)
 
 
 def _context_block(index: int, chunk: RetrievedChunk) -> str:

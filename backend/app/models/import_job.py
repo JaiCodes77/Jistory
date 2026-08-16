@@ -15,20 +15,31 @@ class ImportSource(str, enum.Enum):
 class ImportStatus(str, enum.Enum):
     UPLOADED = "uploaded"
     PROCESSING = "processing"
-    COMPLETED = "completed"
+    PARSED = "parsed"
+    INDEXING = "indexing"
+    READY = "ready"
     FAILED = "failed"
     # Legacy values kept so existing rows remain readable.
     PENDING = "pending"
-    PARSED = "parsed"
+    COMPLETED = "completed"
 
 
 PARSEABLE_STATUSES = frozenset(
     {
         ImportStatus.UPLOADED.value,
         ImportStatus.PROCESSING.value,
+        ImportStatus.PARSED.value,
+        ImportStatus.INDEXING.value,
+        ImportStatus.READY.value,
         ImportStatus.COMPLETED.value,
         ImportStatus.PENDING.value,
-        ImportStatus.PARSED.value,
+    }
+)
+
+READY_STATUSES = frozenset(
+    {
+        ImportStatus.READY.value,
+        ImportStatus.COMPLETED.value,
     }
 )
 
@@ -63,3 +74,5 @@ class ImportJob(Base):
     conversations_imported: Mapped[int | None] = mapped_column(Integer, nullable=True)
     messages_imported: Mapped[int | None] = mapped_column(Integer, nullable=True)
     conversations_skipped: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    chunks_indexed: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    index_error: Mapped[str | None] = mapped_column(Text, nullable=True)

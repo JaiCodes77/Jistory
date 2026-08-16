@@ -105,10 +105,11 @@ class ParseService:
             f"Parsed {conversations_count} conversations / {messages_count} messages "
             f"(skipped {parse_result.skipped}) in {elapsed_label}.",
         ]
-        job.status = ImportStatus.COMPLETED.value
+        job.status = ImportStatus.PARSED.value
         job.conversations_imported = conversations_count
         job.messages_imported = messages_count
         job.conversations_skipped = parse_result.skipped
+        job.index_error = None
         job.notes = " ".join(part for part in notes_parts if part).strip()
 
         self.db.add(job)
@@ -126,15 +127,14 @@ class ParseService:
             elapsed_ms,
         )
 
-        try:
-            from app.embeddings.indexer import index_import_job
+        job.status = ImportStatus.INDEXING.value
+        self.db.add(job)
+        self.db.commit()
+        self.db.refresh(job)
 
-            index_import_job(self.db, job.id)
-        except Exception:
-            logger.exception(
-                "Embedding index failed for import %s (keyword search still available)",
-                job.id,
-            )
+        from app.embeddings.jobs import schedule_embedding_index
+
+        schedule_embedding_index(job.id)
 
         return ParseJobResponse(
             success=True,
@@ -145,6 +145,8 @@ class ParseService:
             elapsed=elapsed_label,
             elapsed_ms=elapsed_ms,
             status=job.status,
+            chunks_indexed=job.chunks_indexed,
+            index_error=job.index_error,
         )
 
     def _mark_failed(self, job: ImportJob, notes: str) -> None:
@@ -167,21 +169,31 @@ class ParseService:
         else:
             candidates.extend(
                 [
-                    (imports_root / raw).resolve(),
                     (data_root / raw).resolve(),
+                    (imports_root / raw).resolve(),
+                    (imports_root / raw.name).resolve(),
                 ]
             )
 
+        safe: list[Path] = []
         for candidate in candidates:
             try:
                 candidate.relative_to(imports_root)
-                return candidate
+                safe.append(candidate)
+                continue
             except ValueError:
                 pass
             try:
                 candidate.relative_to(data_root)
-                return candidate
+                safe.append(candidate)
             except ValueError:
                 pass
 
-        raise ImportValidationError("Import folder path is invalid.", code="unsafe_path")
+        for candidate in safe:
+            if candidate.exists() and candidate.is_dir():
+                return candidate
+
+        raise ImportValidationError(
+            "Import folder not found. The export may have been removed.",
+            code="missing_folder",
+        )

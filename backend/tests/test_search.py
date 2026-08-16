@@ -85,3 +85,5 @@ def test_conversation_messages_pagination(client: TestClient) -> None:
     assert body["total"] >= 1
     assert len(body["items"]) == 1
     assert body["items"][0]["role"] in {"user", "assistant", "system", "tool"}
+    assert "has_after" in body
+    assert "has_before" in body

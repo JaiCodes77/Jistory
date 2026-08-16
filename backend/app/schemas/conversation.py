@@ -44,6 +44,8 @@ class MessageListResponse(BaseModel):
     page_size: int
     total: int
     conversation: ConversationDetail
+    has_before: bool = False
+    has_after: bool = False
 
 
 class ConversationListQuery(BaseModel):

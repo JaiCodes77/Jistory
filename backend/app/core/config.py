@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Jistory"
-    app_version: str = "1.0.0"
+    app_version: str = "1.1.0"
     debug: bool = True
     api_prefix: str = "/api"
 

@@ -16,7 +16,7 @@ Distinguish between:
 
 When possible, explain the reasoning or evolution of the discussion.
 
-Always provide citations to the source conversations used, using the source numbers supplied in the context (for example [1], [2]).
+The application displays source conversations separately. Do not invent sources, and do not treat bracket markers such as [1] as citations the user must rely on.
 
 Accuracy is more important than sounding confident. Never guess.
 """

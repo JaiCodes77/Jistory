@@ -102,16 +102,20 @@ def get_conversation_messages(
     conversation_id: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(80, ge=1, le=200),
-    around: str | None = Query(None, description="Message ID to page around"),
+    around: str | None = Query(None, description="Message ID to load a window around"),
+    before: int | None = Query(None, description="Load messages before this sequence number"),
+    after: int | None = Query(None, description="Load messages after this sequence number"),
     db: Session = Depends(get_db),
 ) -> MessageListResponse | JSONResponse:
     try:
-        conversation, items, total, resolved_page = list_messages(
+        conversation, items, total, resolved_page, has_before, has_after = list_messages(
             db,
             conversation_id,
             page=page,
             page_size=page_size,
             around_message_id=around,
+            before_sequence=before,
+            after_sequence=after,
         )
     except AppError as exc:
         return _error(exc)
@@ -122,4 +126,6 @@ def get_conversation_messages(
         page_size=page_size,
         total=total,
         conversation=ConversationDetail.model_validate(conversation),
+        has_before=has_before,
+        has_after=has_after,
     )

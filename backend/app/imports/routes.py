@@ -4,13 +4,37 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
+from app.embeddings.runtime import get_embedding_status
 from app.imports.parse_service import ParseService
 from app.imports.service import ImportService
 from app.imports.validators import ImportValidationError
+from app.models.import_job import ImportJob
 from app.schemas.import_job import ImportErrorResponse, ImportJobResponse
 from app.schemas.parse import ParseJobResponse
 
 router = APIRouter(prefix="/import", tags=["import"])
+
+
+def import_job_response(job: ImportJob) -> ImportJobResponse:
+    embedding = get_embedding_status()
+    return ImportJobResponse(
+        success=True,
+        importId=job.id,
+        source=job.source,
+        folder=job.folder_path,
+        status=job.status,
+        filename=job.original_filename,
+        fileSize=job.file_size,
+        importedAt=job.imported_at,
+        notes=job.notes,
+        conversations=job.conversations_imported,
+        messages=job.messages_imported,
+        skipped=job.conversations_skipped,
+        chunks_indexed=job.chunks_indexed,
+        index_error=job.index_error,
+        embedding_status=embedding["status"],
+        embedding_status_detail=embedding["detail"],
+    )
 
 
 @router.post(
@@ -90,3 +114,24 @@ def parse_import_job(
                 code="server_unavailable",
             ).model_dump(),
         )
+
+
+@router.get(
+    "/{import_id}",
+    response_model=ImportJobResponse,
+    responses={404: {"model": ImportErrorResponse}},
+)
+def get_import_job(
+    import_id: str,
+    db: Session = Depends(get_db),
+) -> ImportJobResponse | JSONResponse:
+    job = db.get(ImportJob, import_id)
+    if job is None:
+        return JSONResponse(
+            status_code=404,
+            content=ImportErrorResponse(
+                error="Import job was not found.",
+                code="import_not_found",
+            ).model_dump(),
+        )
+    return import_job_response(job)

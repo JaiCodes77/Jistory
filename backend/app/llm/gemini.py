@@ -9,6 +9,46 @@ from app.llm.base import ChatTurn, LLMProvider
 logger = logging.getLogger("jistory.llm")
 
 
+def map_gemini_exception(exc: Exception) -> AppError:
+    text = str(exc).lower()
+    name = type(exc).__name__.lower()
+    combined = f"{name} {text}"
+    if any(
+        token in combined
+        for token in (
+            "api key not valid",
+            "invalid api key",
+            "api_key_invalid",
+            "incorrect api key",
+            "unauthenticated",
+            "unauthorized",
+            "permission_denied",
+        )
+    ):
+        return AppError(
+            "Gemini rejected the API key. Update it in Settings or your .env file.",
+            code="invalid_api_key",
+            status_code=400,
+        )
+    if any(token in combined for token in ("timeout", "timed out", "deadline exceeded")):
+        return AppError(
+            "Gemini timed out. Please try again.",
+            code="llm_timeout",
+            status_code=504,
+        )
+    if any(token in combined for token in ("resource_exhausted", "rate limit", "quota", "429")):
+        return AppError(
+            "Gemini is rate-limited right now. Please wait and try again.",
+            code="llm_rate_limited",
+            status_code=429,
+        )
+    return AppError(
+        "Jistory could not reach Gemini. Check your API key and try again.",
+        code="llm_unavailable",
+        status_code=502,
+    )
+
+
 class GeminiProvider(LLMProvider):
     def __init__(
         self,
@@ -52,49 +92,59 @@ class GeminiProvider(LLMProvider):
     ) -> str:
         client = self._client_or_raise()
         contents = self._build_contents(history, prompt)
-        last_error: Exception | None = None
+        last_error: AppError | None = None
 
         for attempt in range(self.max_retries + 1):
             try:
-                try:
-                    from google.genai import types
-
-                    config = types.GenerateContentConfig(
-                        system_instruction=system,
-                        temperature=0.2,
-                        http_options=types.HttpOptions(timeout=self.timeout_seconds * 1000),
-                    )
-                    response = client.models.generate_content(
-                        model=self.model_name,
-                        contents=contents,
-                        config=config,
-                    )
-                except Exception:
-                    response = client.models.generate_content(
-                        model=self.model_name,
-                        contents=f"{system}\n\n{prompt}",
-                    )
-                text = getattr(response, "text", None)
+                text = self._generate_once(client, system, contents)
                 if not text:
                     raise AppError(
                         "Gemini returned an empty answer. Please try again.",
                         code="empty_completion",
                         status_code=502,
                     )
-                return text.strip()
-            except AppError:
-                raise
-            except Exception as exc:
+                return text
+            except AppError as exc:
+                if exc.code in {"missing_api_key", "invalid_api_key", "missing_dependency"}:
+                    raise
                 last_error = exc
-                logger.warning("Gemini request failed (attempt %s)", attempt + 1)
-                if attempt < self.max_retries:
-                    time.sleep(0.6 * (attempt + 1))
+            except Exception as exc:
+                last_error = map_gemini_exception(exc)
+                if last_error.code in {"invalid_api_key", "missing_api_key"}:
+                    raise last_error from exc
+            logger.warning("Gemini request failed (attempt %s)", attempt + 1)
+            if attempt < self.max_retries:
+                time.sleep(0.6 * (attempt + 1))
 
-        raise AppError(
+        raise last_error or AppError(
             "Jistory could not reach Gemini. Check your API key and try again.",
             code="llm_unavailable",
             status_code=502,
-        ) from last_error
+        )
+
+    def _generate_once(self, client, system: str, contents: list[dict[str, str]]) -> str:
+        try:
+            from google.genai import types
+
+            config = types.GenerateContentConfig(
+                system_instruction=system,
+                temperature=0.2,
+                http_options=types.HttpOptions(timeout=self.timeout_seconds * 1000),
+            )
+            response = client.models.generate_content(
+                model=self.model_name,
+                contents=contents,
+                config=config,
+            )
+        except AppError:
+            raise
+        except (ImportError, TypeError, AttributeError):
+            response = client.models.generate_content(
+                model=self.model_name,
+                contents=contents,
+            )
+        text = getattr(response, "text", None)
+        return (text or "").strip()
 
     def _build_contents(self, history: list[ChatTurn], prompt: str) -> list[dict[str, str]]:
         contents: list[dict[str, str]] = []

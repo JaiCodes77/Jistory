@@ -1,7 +1,7 @@
 from collections.abc import Generator
 
 from sqlalchemy import create_engine, event, text
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import DATA_DIR, get_settings
@@ -46,12 +46,23 @@ def reset_engine() -> None:
         _engine.dispose()
     _engine = None
     _SessionLocal = None
+    from app.embeddings.factory import reset_embedding_provider
+
+    reset_embedding_provider()
 
 
-def _ensure_sqlite_columns(engine: Engine) -> None:
+def _is_sqlite(conn: Connection) -> bool:
+    return conn.dialect.name == "sqlite"
+
+
+def _table_columns(conn: Connection, table: str) -> set[str]:
+    rows = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+    return {row[1] for row in rows}
+
+
+def _ensure_sqlite_columns(conn: Connection) -> None:
     """Add newly introduced columns on existing SQLite tables (create_all won't alter)."""
-    settings = get_settings()
-    if not settings.database_url.startswith("sqlite"):
+    if not _is_sqlite(conn):
         return
 
     alterations = {
@@ -59,20 +70,96 @@ def _ensure_sqlite_columns(engine: Engine) -> None:
             ("conversations_imported", "INTEGER"),
             ("messages_imported", "INTEGER"),
             ("conversations_skipped", "INTEGER"),
+            ("chunks_indexed", "INTEGER"),
+            ("index_error", "TEXT"),
         ]
     }
 
-    with engine.begin() as conn:
-        for table, columns in alterations.items():
-            existing = {
-                row[1]
-                for row in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
-            }
-            if not existing:
-                continue
-            for name, col_type in columns:
-                if name not in existing:
-                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {col_type}"))
+    for table, columns in alterations.items():
+        existing = _table_columns(conn, table)
+        if not existing:
+            continue
+        for name, col_type in columns:
+            if name not in existing:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {col_type}"))
+
+
+def _ensure_unique_indexes(conn: Connection) -> None:
+    """Create (source, external_id) uniqueness on existing databases without dropping data."""
+    if not _is_sqlite(conn):
+        return
+    if not _table_columns(conn, "conversations"):
+        return
+
+    indexes = conn.execute(text("PRAGMA index_list(conversations)")).fetchall()
+    names = {row[1] for row in indexes}
+    if "uq_conversation_source_external" in names:
+        return
+
+    dupes = conn.execute(
+        text(
+            """
+            SELECT source, external_id
+            FROM conversations
+            GROUP BY source, external_id
+            HAVING COUNT(*) > 1
+            """
+        )
+    ).fetchall()
+    for source, external_id in dupes:
+        columns = _table_columns(conn, "conversations")
+        order_sql = "id DESC"
+        if "updated_at" in columns or "created_at" in columns:
+            order_sql = "COALESCE(updated_at, created_at) DESC, id DESC"
+        ids = [
+            row[0]
+            for row in conn.execute(
+                text(
+                    f"""
+                    SELECT id FROM conversations
+                    WHERE source = :source AND external_id = :external_id
+                    ORDER BY {order_sql}
+                    """
+                ),
+                {"source": source, "external_id": external_id},
+            ).fetchall()
+        ]
+        for conv_id in ids[1:]:
+            if _table_columns(conn, "messages"):
+                if "parent_message_id" in _table_columns(conn, "messages"):
+                    conn.execute(
+                        text("UPDATE messages SET parent_message_id = NULL WHERE conversation_id = :id"),
+                        {"id": conv_id},
+                    )
+                conn.execute(text("DELETE FROM messages WHERE conversation_id = :id"), {"id": conv_id})
+            if _table_columns(conn, "memory_chunks"):
+                conn.execute(
+                    text("DELETE FROM memory_chunks WHERE conversation_id = :id"),
+                    {"id": conv_id},
+                )
+            conn.execute(text("DELETE FROM conversations WHERE id = :id"), {"id": conv_id})
+
+    conn.execute(
+        text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_conversation_source_external "
+            "ON conversations (source, external_id)"
+        )
+    )
+
+
+def ensure_runtime_schema(bind: Engine | Connection) -> None:
+    """Additive SQLite upgrades used at startup and by Alembic.
+
+    create_all remains the source of truth for new databases. This function
+    never drops tables or the local jistory.db file.
+    """
+    if isinstance(bind, Engine):
+        with bind.begin() as conn:
+            _ensure_sqlite_columns(conn)
+            _ensure_unique_indexes(conn)
+        return
+    _ensure_sqlite_columns(bind)
+    _ensure_unique_indexes(bind)
 
 
 def init_db() -> None:
@@ -86,7 +173,7 @@ def init_db() -> None:
 
     engine = get_engine()
     Base.metadata.create_all(bind=engine)
-    _ensure_sqlite_columns(engine)
+    ensure_runtime_schema(engine)
     try:
         ensure_fts(engine)
     except Exception:

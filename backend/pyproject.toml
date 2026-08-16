@@ -2,7 +2,7 @@
 name = "jistory"
 version = "1.0.0"
 description = "Local-first AI conversation memory system"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",

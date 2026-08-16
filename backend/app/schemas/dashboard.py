@@ -54,6 +54,8 @@ class UserSettingsPublic(BaseModel):
     retrieval_limit: int
     stored_locally: bool = True
     sent_to_gemini_on_ask: bool = True
+    embedding_status: str = "idle"
+    embedding_status_detail: str = ""
 
 
 class UserSettingsUpdate(BaseModel):
