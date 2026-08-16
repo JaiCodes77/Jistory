@@ -5,6 +5,7 @@ import json
 import logging
 import math
 import uuid
+from collections.abc import Sequence
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -84,7 +85,11 @@ def replace_chunks(
     return stored
 
 
-def load_embedded_chunks(db: Session) -> list[MemoryChunk]:
-    return list(
-        db.scalars(select(MemoryChunk).where(MemoryChunk.embedding.is_not(None))).all()
-    )
+def load_embedded_chunks(
+    db: Session,
+    conversation_ids: Sequence[str] | None = None,
+) -> list[MemoryChunk]:
+    stmt = select(MemoryChunk).where(MemoryChunk.embedding.is_not(None))
+    if conversation_ids:
+        stmt = stmt.where(MemoryChunk.conversation_id.in_(list(conversation_ids)))
+    return list(db.scalars(stmt).all())

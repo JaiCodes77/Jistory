@@ -207,7 +207,8 @@ export async function searchMemories(
 
 export async function askJistory(
   message: string,
-  conversationId?: string | null
+  conversationId?: string | null,
+  taggedConversationIds?: string[]
 ): Promise<AskResponse> {
   return apiFetch<AskResponse>("/ask", {
     method: "POST",
@@ -215,6 +216,7 @@ export async function askJistory(
     body: JSON.stringify({
       message,
       conversation_id: conversationId || null,
+      tagged_conversation_ids: taggedConversationIds ?? [],
     }),
   })
 }

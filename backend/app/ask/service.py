@@ -7,7 +7,13 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.ask.prompts import NOT_FOUND_ANSWER, SYSTEM_PROMPT, build_user_prompt, format_context_block
+from app.ask.prompts import (
+    NOT_FOUND_ANSWER,
+    NOT_FOUND_IN_TAGS,
+    SYSTEM_PROMPT,
+    build_user_prompt,
+    format_context_block,
+)
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.llm.base import ChatTurn, LLMProvider
@@ -21,6 +27,7 @@ from app.user_settings.store import resolve_settings
 logger = logging.getLogger("jistory.ask")
 
 MAX_SNIPPET = 280
+MAX_TAGGED_CONVERSATIONS = 8
 
 
 def ask(
@@ -29,6 +36,7 @@ def ask(
     *,
     message: str,
     conversation_id: str | None,
+    tagged_conversation_ids: list[str] | None = None,
     llm: LLMProvider | None = None,
 ) -> AskResponse:
     question = message.strip()
@@ -36,19 +44,29 @@ def ask(
         raise AppError("Enter a question.", code="empty_message", status_code=400)
 
     settings = resolve_settings(settings)
+    tagged = _resolve_tagged_conversations(db, tagged_conversation_ids)
+    tagged_ids = [row.id for row in tagged]
+    tagged_titles = [row.title.strip() if row.title and row.title.strip() else "Untitled conversation" for row in tagged]
     session = _get_or_create_session(db, conversation_id)
     history = list(session.turns)[-settings.ask_max_history_turns :]
 
     retrieval_query = _retrieval_query(question, history)
-    chunks = hybrid_retrieve(db, retrieval_query, settings, limit=settings.retrieval_limit)
+    chunks = hybrid_retrieve(
+        db,
+        retrieval_query,
+        settings,
+        limit=settings.retrieval_limit,
+        conversation_ids=tagged_ids or None,
+    )
 
     sources = [_to_source(chunk) for chunk in chunks]
     if not chunks:
-        answer = (
-            "Jistory doesn't have any memories yet. Import a conversation history first."
-            if not conversation_exists(db)
-            else NOT_FOUND_ANSWER
-        )
+        if tagged:
+            answer = NOT_FOUND_IN_TAGS
+        elif not conversation_exists(db):
+            answer = "Jistory doesn't have any memories yet. Import a conversation history first."
+        else:
+            answer = NOT_FOUND_ANSWER
         _persist_turn(db, session, question, answer, sources)
         return AskResponse(
             answer=answer,
@@ -57,7 +75,11 @@ def ask(
             retrieved=0,
         )
 
-    prompt = build_user_prompt(question, [_context_block(i, chunk) for i, chunk in enumerate(chunks, start=1)])
+    prompt = build_user_prompt(
+        question,
+        [_context_block(i, chunk) for i, chunk in enumerate(chunks, start=1)],
+        tagged_titles=tagged_titles or None,
+    )
     provider = llm or require_llm_provider(settings)
     chat_history = [ChatTurn(role=turn.role, content=turn.content) for turn in history]
 
@@ -83,6 +105,35 @@ def ask(
         conversation_id=session.id,
         retrieved=len(chunks),
     )
+
+
+def _resolve_tagged_conversations(db: Session, raw_ids: list[str] | None) -> list[Conversation]:
+    unique: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_ids or []:
+        value = (raw or "").strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        unique.append(value)
+    if not unique:
+        return []
+    if len(unique) > MAX_TAGGED_CONVERSATIONS:
+        raise AppError(
+            "You can tag at most 8 conversations.",
+            code="too_many_tags",
+            status_code=400,
+        )
+    rows = list(db.scalars(select(Conversation).where(Conversation.id.in_(unique))).all())
+    found = {row.id: row for row in rows}
+    missing = [conversation_id for conversation_id in unique if conversation_id not in found]
+    if missing:
+        raise AppError(
+            "A tagged conversation was not found.",
+            code="tagged_not_found",
+            status_code=400,
+        )
+    return [found[conversation_id] for conversation_id in unique]
 
 
 def _get_or_create_session(db: Session, conversation_id: str | None) -> AskSession:

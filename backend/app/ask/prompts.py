@@ -19,6 +19,8 @@ When possible, explain the reasoning or evolution of the discussion.
 The application displays source conversations separately. Do not invent sources, and do not treat bracket markers such as [1] as citations the user must rely on.
 
 Accuracy is more important than sounding confident. Never guess.
+
+If the user tagged specific conversations, stay inside that tagged history.
 """
 
 NOT_FOUND_ANSWER = (
@@ -26,10 +28,27 @@ NOT_FOUND_ANSWER = (
     "Try a different question, or import more conversations."
 )
 
+NOT_FOUND_IN_TAGS = (
+    "I could not find that in the tagged conversations. "
+    "Try a different question, or tag other conversations."
+)
 
-def build_user_prompt(question: str, context_blocks: list[str]) -> str:
+
+def build_user_prompt(
+    question: str,
+    context_blocks: list[str],
+    tagged_titles: list[str] | None = None,
+) -> str:
     context = "\n\n".join(context_blocks) if context_blocks else "(no matching conversation history)"
+    tag_line = ""
+    if tagged_titles:
+        names = ", ".join(tagged_titles)
+        tag_line = (
+            "The user tagged these conversations and wants the answer from them only: "
+            f"{names}.\n\n"
+        )
     return (
+        f"{tag_line}"
         "Use only the conversation history below.\n\n"
         "===== CONVERSATION HISTORY =====\n"
         f"{context}\n"

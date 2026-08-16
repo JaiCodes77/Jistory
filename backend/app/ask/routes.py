@@ -24,6 +24,7 @@ def ask_jistory(
             settings,
             message=payload.message,
             conversation_id=payload.conversation_id,
+            tagged_conversation_ids=payload.tagged_conversation_ids,
         )
     except AppError as exc:
         return JSONResponse(

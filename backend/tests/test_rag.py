@@ -129,6 +129,105 @@ def test_ask_without_api_key_returns_user_error(client: TestClient) -> None:
     assert "traceback" not in body["error"].lower()
 
 
+def test_ask_unknown_tagged_conversation_returns_error(client: TestClient) -> None:
+    _seed(client)
+    response = client.post(
+        "/api/ask",
+        json={
+            "message": "What did I decide?",
+            "tagged_conversation_ids": ["00000000-0000-0000-0000-000000000000"],
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "tagged_not_found"
+
+
+def _seed_two(client: TestClient) -> None:
+    payload = export_zip(
+        [
+            chatgpt_conversation(
+                conversation_id="g1",
+                title="Grafana alert architecture",
+                messages=[
+                    ("u1", "user", "What should we use for Grafana alerts?"),
+                    (
+                        "a1",
+                        "assistant",
+                        "We should use Prometheus as the datasource and Grafana for alert rules.",
+                    ),
+                    ("u2", "user", "That is the decision then."),
+                ],
+            ),
+            chatgpt_conversation(
+                conversation_id="r1",
+                title="Redis caching",
+                messages=[
+                    ("u2", "user", "Should we cache with Redis?"),
+                    ("a2", "assistant", "Yes, Redis is a good cache for FastAPI."),
+                ],
+            ),
+        ]
+    )
+    uploaded = client.post("/api/import/chatgpt", files={"file": ("a.zip", payload, "application/zip")})
+    parsed = client.post(f"/api/import/{uploaded.json()['importId']}/parse")
+    assert parsed.status_code == 200
+
+
+def _conversation_id(client: TestClient, title: str) -> str:
+    items = client.get("/api/conversations").json()["items"]
+    match = next(item for item in items if item["title"] == title)
+    return match["id"]
+
+
+def test_ask_tags_scope_retrieval_to_tagged_chat(client: TestClient) -> None:
+    _seed_two(client)
+    redis_id = _conversation_id(client, "Redis caching")
+    llm = RecordingLLM()
+    db = get_session_factory()()
+    try:
+        result = ask(
+            db,
+            get_settings(),
+            message="What conclusion did I reach about Grafana alerts?",
+            conversation_id=None,
+            tagged_conversation_ids=[redis_id],
+            llm=llm,
+        )
+    finally:
+        db.close()
+
+    assert llm.calls, "expected the LLM to receive tagged conversation context"
+    prompt = llm.calls[0]["prompt"]
+    assert "Redis" in prompt
+    assert "Prometheus" not in prompt
+    assert "tagged these conversations" in prompt
+    assert result.sources
+    assert all(source.conversation_id == redis_id for source in result.sources)
+
+
+def test_ask_tags_include_the_tagged_grafana_chat(client: TestClient) -> None:
+    _seed_two(client)
+    grafana_id = _conversation_id(client, "Grafana alert architecture")
+    llm = RecordingLLM()
+    db = get_session_factory()()
+    try:
+        result = ask(
+            db,
+            get_settings(),
+            message="What conclusion did I reach about Grafana alerts?",
+            conversation_id=None,
+            tagged_conversation_ids=[grafana_id],
+            llm=llm,
+        )
+    finally:
+        db.close()
+
+    prompt = llm.calls[0]["prompt"]
+    assert "Prometheus" in prompt
+    assert result.sources
+    assert all(source.conversation_id == grafana_id for source in result.sources)
+
+
 def test_settings_does_not_expose_api_key(client: TestClient) -> None:
     patched = client.patch(
         "/api/settings",

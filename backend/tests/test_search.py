@@ -56,6 +56,31 @@ def test_search_no_results(client: TestClient) -> None:
     assert response.json()["total"] == 0
 
 
+def test_keyword_search_can_scope_to_one_conversation(client: TestClient) -> None:
+    _import_and_parse(client)
+    items = client.get("/api/conversations").json()["items"]
+    redis = next(item for item in items if item["title"] == "Redis caching")
+    grafana = next(item for item in items if item["title"] == "Grafana alert architecture")
+
+    from app.db.session import get_session_factory
+    from app.retrieval.hybrid import search_fts
+
+    db = get_session_factory()()
+    try:
+        hits, _ = search_fts(
+            db,
+            "Grafana Redis FastAPI",
+            limit=20,
+            conversation_ids=[redis["id"]],
+        )
+    finally:
+        db.close()
+
+    assert hits
+    assert all(hit.conversation_id == redis["id"] for hit in hits)
+    assert grafana["id"] not in {hit.conversation_id for hit in hits}
+
+
 def test_conversation_filters_and_pagination(client: TestClient) -> None:
     _import_and_parse(client)
     listed = client.get(

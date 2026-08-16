@@ -34,6 +34,7 @@ class SourceReference(BaseModel):
 class AskRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     conversation_id: str | None = None
+    tagged_conversation_ids: list[str] = Field(default_factory=list, max_length=8)
 
 
 class AskResponse(BaseModel):
