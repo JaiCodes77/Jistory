@@ -38,12 +38,18 @@ export function Sidebar() {
                 className={cn(
                   "flex h-8 items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
                   isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
                     : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
                 )}
+                aria-current={isActive ? "page" : undefined}
               >
                 <Icon className="size-4 shrink-0 opacity-70" />
                 <span className="truncate">{item.title}</span>
+                {item.href === "/search" && (
+                  <kbd className="ml-auto rounded border border-border px-1 text-[10px] font-normal text-muted-foreground">
+                    ⌘K
+                  </kbd>
+                )}
               </Link>
             )
           })}
@@ -52,6 +58,11 @@ export function Sidebar() {
 
       <div className="border-t border-border px-4 py-3">
         <p className="text-[11px] text-muted-foreground">Local-first memory</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Search with{" "}
+          <kbd className="rounded border border-border px-1">/</kbd> or{" "}
+          <kbd className="rounded border border-border px-1">⌘K</kbd>
+        </p>
       </div>
     </aside>
   )

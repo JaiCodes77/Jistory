@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from datetime import timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -107,19 +107,50 @@ def get_dashboard(db: Session) -> DashboardResponse:
     )
 
 
-def _conversations_over_time(db: Session) -> list[TimeBucket]:
-    rows = db.scalars(select(Conversation.created_at)).all()
+def _conversations_over_time(db: Session, *, window_days: int = 90) -> list[TimeBucket]:
+    """Daily counts, padded so a single busy day does not become one full-width bar."""
+    rows = db.execute(
+        select(
+            func.coalesce(
+                Conversation.created_at,
+                Conversation.first_message_at,
+                Conversation.last_message_at,
+            )
+        )
+    ).all()
     counts: Counter[str] = Counter()
-    for value in rows:
-        if value is None:
+    for (value,) in rows:
+        day = _as_utc_date(value)
+        if day is None:
             continue
+        counts[day.isoformat()] += 1
+    if not counts:
+        return []
+
+    today = datetime.now(timezone.utc).date()
+    oldest = min(date.fromisoformat(key) for key in counts)
+    start = max(oldest, today - timedelta(days=window_days - 1))
+    min_span = min(29, window_days - 1)
+    if (today - start).days < min_span:
+        start = today - timedelta(days=min_span)
+
+    buckets: list[TimeBucket] = []
+    cursor = start
+    while cursor <= today:
+        key = cursor.isoformat()
+        buckets.append(TimeBucket(date=key, count=counts.get(key, 0)))
+        cursor += timedelta(days=1)
+    return buckets
+
+
+def _as_utc_date(value: datetime | date | None) -> date | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
         if value.tzinfo is None:
             value = value.replace(tzinfo=timezone.utc)
-        counts[value.date().isoformat()] += 1
-    return [
-        TimeBucket(date=day, count=count)
-        for day, count in sorted(counts.items())[-90:]
-    ]
+        return value.date()
+    return value
 
 
 def _frequent_topics(db: Session) -> list[TopicCount]:

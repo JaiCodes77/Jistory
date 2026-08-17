@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   MessageSquareText,
+  Search,
   Settings,
   Sparkles,
   Upload,
@@ -23,6 +24,11 @@ export const mainNav: NavItem[] = [
     title: "Conversations",
     href: "/conversations",
     icon: MessageSquareText,
+  },
+  {
+    title: "Search",
+    href: "/search",
+    icon: Search,
   },
   {
     title: "Ask Jistory",

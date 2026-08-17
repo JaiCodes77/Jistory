@@ -67,9 +67,9 @@ export function formatDayLabel(
 }
 
 function parseDateValue(value: string): Date | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
-  const date = match
-    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  const date = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
     : new Date(value)
   return Number.isNaN(date.getTime()) ? null : date
 }

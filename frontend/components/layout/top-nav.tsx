@@ -18,7 +18,7 @@ export function TopNav() {
         <button
           type="button"
           onClick={() => window.dispatchEvent(new Event("jistory:open-search"))}
-          className="hidden items-center gap-2 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted sm:inline-flex"
+          className="inline-flex items-center gap-2 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted"
         >
           <Search className="size-3" />
           Search

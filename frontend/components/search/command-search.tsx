@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { LoaderCircle, Search } from "lucide-react"
 
-import { conversationTitle, formatDate, searchMemories } from "@/lib/api"
+import { conversationTitle, formatDate, getDashboard, searchMemories } from "@/lib/api"
 import { isEditableTarget } from "@/lib/keyboard"
 import type { SearchHit } from "@/types/api"
 import { cn } from "@/lib/utils"
@@ -19,6 +19,7 @@ export function CommandSearch() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<SearchHit[]>([])
+  const [hasMemories, setHasMemories] = useState<boolean | null>(null)
 
   const close = useCallback(() => {
     setOpen(false)
@@ -61,9 +62,14 @@ export function CommandSearch() {
   useEffect(() => {
     if (open) {
       const id = window.setTimeout(() => inputRef.current?.focus(), 10)
+      if (hasMemories === null) {
+        void getDashboard()
+          .then((data) => setHasMemories(data.total_conversations > 0))
+          .catch(() => setHasMemories(null))
+      }
       return () => window.clearTimeout(id)
     }
-  }, [open])
+  }, [open, hasMemories])
 
   useEffect(() => {
     if (lastPathname.current !== pathname) {
@@ -111,7 +117,7 @@ export function CommandSearch() {
         aria-label="Close search"
         onClick={close}
       />
-      <div className="relative z-10 w-full max-w-xl overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+      <div className="relative z-10 w-full max-w-xl overflow-hidden rounded-xl border border-border bg-card">
         <div className="flex items-center gap-2 border-b border-border px-3">
           <Search className="size-4 text-muted-foreground" />
           <input
@@ -134,9 +140,18 @@ export function CommandSearch() {
           {error && (
             <p className="px-2 py-3 text-sm text-destructive">{error}</p>
           )}
-          {query.trim().length < 2 && (
+          {hasMemories === false && (
             <p className="px-2 py-3 text-sm text-muted-foreground">
-              Type at least two characters. Conversations stay on this machine.
+              Nothing to search yet.{" "}
+              <Link href="/import" className="underline-offset-2 hover:underline" onClick={close}>
+                Import conversations
+              </Link>{" "}
+              first.
+            </p>
+          )}
+          {hasMemories !== false && query.trim().length < 2 && (
+            <p className="px-2 py-3 text-sm text-muted-foreground">
+              Type at least two characters. Hits open the matching message.
             </p>
           )}
           {empty && (

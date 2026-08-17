@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
-import { LoaderCircle, MessageSquareText } from "lucide-react"
 
+import { EmptyState } from "@/components/layout/empty-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -83,6 +83,8 @@ export function ConversationBrowser() {
   }
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const filtersActive =
+    Boolean(debouncedSearch.trim()) || Boolean(source) || range !== "all"
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
@@ -156,28 +158,20 @@ export function ConversationBrowser() {
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {loading && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <LoaderCircle className="size-4 animate-spin" />
-          Loading conversations…
-        </div>
+        <div className="text-sm text-muted-foreground">Loading conversations…</div>
       )}
 
-      {!loading && total === 0 && (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border px-6 py-16 text-center">
-          <MessageSquareText className="size-6 text-muted-foreground" />
-          <div>
-            <p className="text-sm font-medium">No conversations yet.</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Import your ChatGPT history to start building Jistory.
-            </p>
-          </div>
-          <Link
-            href="/import"
-            className="inline-flex h-8 items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/80"
-          >
-            Go to Import
-          </Link>
-        </div>
+      {!loading && total === 0 && !filtersActive && (
+        <EmptyState
+          title="No conversations yet"
+          description="Import a ChatGPT share link or export ZIP, then browse and search from here."
+        />
+      )}
+
+      {!loading && total === 0 && filtersActive && (
+        <p className="text-sm text-muted-foreground">
+          No conversations match these filters.
+        </p>
       )}
 
       {!loading && items.length > 0 && (

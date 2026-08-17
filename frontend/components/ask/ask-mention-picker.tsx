@@ -1,16 +1,19 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { LoaderCircle } from "lucide-react"
 
 import { conversationTitle, formatDate, listConversations } from "@/lib/api"
 import type { ConversationSummary } from "@/types/api"
 import { cn } from "@/lib/utils"
 
+const FETCH_SIZE = 40
+const VISIBLE_SIZE = 8
+
 type AskMentionPickerProps = {
   query: string
   excludeIds: string[]
   activeIndex: number
+  atMax?: boolean
   onActiveIndexChange: (index: number) => void
   onItemsChange: (items: ConversationSummary[]) => void
   onSelect: (item: ConversationSummary) => void
@@ -20,31 +23,47 @@ export function AskMentionPicker({
   query,
   excludeIds,
   activeIndex,
+  atMax = false,
   onActiveIndexChange,
   onItemsChange,
   onSelect,
 }: AskMentionPickerProps) {
   const [items, setItems] = useState<ConversationSummary[]>([])
-  const [loading, setLoading] = useState(true)
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(!atMax)
   const [error, setError] = useState<string | null>(null)
 
   const excludeKey = excludeIds.join(",")
+  const trimmedQuery = query.trim()
 
   useEffect(() => {
+    if (atMax) {
+      setItems([])
+      onItemsChange([])
+      setLoading(false)
+      setError(null)
+      return
+    }
+
     const excluded = new Set(excludeKey ? excludeKey.split(",") : [])
+    setItems((current) => current.filter((item) => !excluded.has(item.id)))
+
     let cancelled = false
     const handle = window.setTimeout(() => {
       setLoading(true)
       setError(null)
       void listConversations({
         page: 1,
-        pageSize: 8,
-        search: query.trim(),
+        pageSize: FETCH_SIZE,
+        search: trimmedQuery,
         sort: "recently_updated",
       })
         .then((response) => {
           if (cancelled) return
-          const next = response.items.filter((item) => !excluded.has(item.id))
+          const next = response.items
+            .filter((item) => !excluded.has(item.id))
+            .slice(0, VISIBLE_SIZE)
+          setTotal(response.total)
           setItems(next)
           onItemsChange(next)
         })
@@ -62,9 +81,22 @@ export function AskMentionPicker({
       cancelled = true
       window.clearTimeout(handle)
     }
-  }, [query, excludeKey, onItemsChange])
+  }, [trimmedQuery, excludeKey, atMax, onItemsChange])
 
   const highlight = items.length === 0 ? 0 : activeIndex % items.length
+
+  let emptyCopy = "No matching conversations."
+  if (atMax) {
+    emptyCopy = "You can tag at most 8 chats. Remove a tag to add another."
+  } else if (total === 0 && !trimmedQuery) {
+    emptyCopy = "No conversations imported yet."
+  } else if (items.length === 0 && excludeIds.length > 0 && !trimmedQuery) {
+    emptyCopy = "All listed chats are already tagged. Type to find another."
+  } else if (items.length === 0 && excludeIds.length > 0 && trimmedQuery) {
+    emptyCopy = "No untagged chats match that name."
+  } else if (trimmedQuery) {
+    emptyCopy = `No conversations match “${trimmedQuery}”.`
+  }
 
   return (
     <div
@@ -72,28 +104,31 @@ export function AskMentionPicker({
       role="listbox"
       aria-label="Tag a conversation"
     >
-      <div className="border-b border-border px-3 py-2">
+      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           Tag a conversation
         </p>
+        <p className="text-[11px] text-muted-foreground">↑↓ Enter Esc</p>
       </div>
       <div className="max-h-64 overflow-auto p-1.5">
-        {loading && (
-          <div className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground">
-            <LoaderCircle className="size-4 animate-spin" />
-            Searching conversations…
-          </div>
+        {atMax && (
+          <p className="px-2 py-3 text-sm text-muted-foreground">{emptyCopy}</p>
         )}
-        {error && <p className="px-2 py-3 text-sm text-destructive">{error}</p>}
-        {!loading && !error && items.length === 0 && (
+        {!atMax && loading && items.length === 0 && (
           <p className="px-2 py-3 text-sm text-muted-foreground">
-            No matching conversations.
+            Searching conversations…
           </p>
         )}
-        {!loading &&
+        {!atMax && error && <p className="px-2 py-3 text-sm text-destructive">{error}</p>}
+        {!atMax && !error && !loading && items.length === 0 && (
+          <p className="px-2 py-3 text-sm text-muted-foreground">{emptyCopy}</p>
+        )}
+        {!atMax &&
+          !error &&
           items.map((item, index) => (
             <button
               key={item.id}
+              id={`mention-option-${item.id}`}
               type="button"
               role="option"
               aria-selected={index === highlight}

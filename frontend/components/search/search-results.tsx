@@ -3,11 +3,11 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { LoaderCircle } from "lucide-react"
 
+import { EmptyState } from "@/components/layout/empty-state"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { conversationTitle, formatDate, searchMemories } from "@/lib/api"
+import { conversationTitle, formatDate, getDashboard, searchMemories } from "@/lib/api"
 import type { SearchHit } from "@/types/api"
 
 const PAGE_SIZE = 20
@@ -22,6 +22,13 @@ export function SearchResults() {
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<SearchHit[]>([])
   const [total, setTotal] = useState(0)
+  const [hasMemories, setHasMemories] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    void getDashboard()
+      .then((data) => setHasMemories(data.total_conversations > 0))
+      .catch(() => setHasMemories(null))
+  }, [])
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -64,34 +71,49 @@ export function SearchResults() {
         <h2 className="text-lg font-medium tracking-tight">Search</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Keyword and semantic search over conversations stored on this machine.
+          Press / or ⌘K from anywhere.
         </p>
       </div>
 
-      <form
-        className="flex gap-2"
-        onSubmit={(event) => {
-          event.preventDefault()
-          const next = input.trim()
-          setPage(1)
-          router.replace(next ? `/search?q=${encodeURIComponent(next)}` : "/search")
-        }}
-      >
-        <Input
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          placeholder="Search Grafana, Redis, FastAPI…"
+      {hasMemories === false ? (
+        <EmptyState
+          title="Nothing to search yet"
+          description="Import a conversation first. Search looks through chats stored on this machine."
         />
-        <Button type="submit">Search</Button>
-      </form>
+      ) : (
+        <form
+          className="flex gap-2"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const next = input.trim()
+            setPage(1)
+            router.replace(next ? `/search?q=${encodeURIComponent(next)}` : "/search")
+          }}
+        >
+          <Input
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            placeholder="Search Grafana, Redis, FastAPI…"
+          />
+          <Button type="submit">Search</Button>
+        </form>
+      )}
 
       {loading && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <LoaderCircle className="size-4 animate-spin" />
-          Searching…
-        </div>
+        <div className="text-sm text-muted-foreground">Searching…</div>
       )}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {!loading &&
+        hasMemories !== false &&
+        queryParam.trim().length < 2 &&
+        !error && (
+          <p className="text-sm text-muted-foreground">
+            Type at least two characters. Hits open the conversation with the
+            matching message highlighted.
+          </p>
+        )}
 
       {!loading && queryParam.trim().length >= 2 && total === 0 && !error && (
         <p className="text-sm text-muted-foreground">No results found.</p>
@@ -122,7 +144,7 @@ export function SearchResults() {
       {total > PAGE_SIZE && (
         <div className="flex items-center justify-between text-sm">
           <p className="text-muted-foreground">{total.toLocaleString()} results</p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2">
             <Button
               variant="outline"
               size="sm"
