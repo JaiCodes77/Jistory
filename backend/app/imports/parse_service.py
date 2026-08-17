@@ -59,6 +59,7 @@ class ParseService:
             )
 
         logger.info("Parse started — job=%s source=%s", job.id, job.source)
+        source_label = job.source or "export"
 
         job.status = ImportStatus.PROCESSING.value
         self.db.commit()
@@ -72,11 +73,14 @@ class ParseService:
         except FileNotFoundError as exc:
             self._mark_failed(job, "The export does not contain a conversations file.")
             raise ImportValidationError(str(exc), code="missing_export_files") from exc
+        except ImportValidationError as exc:
+            self._mark_failed(job, exc.message)
+            raise
         except Exception as exc:
             logger.exception("Parse failed for import %s", job.id)
-            self._mark_failed(job, "Failed to parse the ChatGPT export.")
+            self._mark_failed(job, f"Failed to parse the {source_label} export.")
             raise ImportValidationError(
-                "Failed to parse the ChatGPT export. Check that the ZIP is a valid export.",
+                f"Failed to parse the {source_label} export. Check that the ZIP is a valid export.",
                 code="parse_failed",
             ) from exc
 

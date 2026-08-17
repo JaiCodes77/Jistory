@@ -17,7 +17,7 @@ Jistory is not a general-purpose chatbot. If your history does not contain the a
 ## Architecture
 
 ```text
-ChatGPT ZIP
+ChatGPT ZIP or Claude ZIP
     → validate / extract (local)
     → parse into conversations + messages (SQLite)
     → FTS5 keyword index + local embeddings
@@ -25,7 +25,7 @@ ChatGPT ZIP
     → Gemini Flash (only retrieved excerpts, only on Ask)
 ```
 
-Frontend and backend stay separate. Provider integrations are abstracted (`ConversationParser`, `EmbeddingProvider`, `LLMProvider`) so Claude, Gemini, or Cursor imports can be added later without rewriting retrieval.
+Frontend and backend stay separate. Provider integrations are abstracted (`ConversationParser`, `EmbeddingProvider`, `LLMProvider`) so Gemini or Cursor imports can be added later without rewriting retrieval.
 
 ## Tech stack
 
@@ -89,14 +89,25 @@ NEXT_PUBLIC_API_URL=http://localhost:8000/api
 
 The Gemini API key can also be saved from Settings. That writes a local `settings.json` next to the database. Environment variables take precedence. The API never returns the key.
 
-## Importing ChatGPT history
+## Importing history
+
+### ChatGPT
 
 1. In ChatGPT: **Settings → Data controls → Export data**.
 2. Download the ZIP.
 3. Open Jistory at [http://localhost:3000](http://localhost:3000).
 4. Go to **Import**.
-5. Upload the ZIP.
-6. Click **Parse Conversations**.
+5. Choose **ChatGPT**, upload the ZIP, then click **Parse Conversations**.
+
+You can also paste a public `chatgpt.com/share/...` link to import one chat without waiting for the export email.
+
+### Claude
+
+1. In Claude: **Settings → Privacy → Export data**.
+2. Download the ZIP Anthropic emails you.
+3. Open **Import**, choose **Claude**, upload the ZIP, then click **Parse Conversations**.
+
+Public `claude.ai/share/...` links work the same way as ChatGPT shares. Private `claude.ai/chat/...` URLs are rejected.
 
 Parse stores conversations immediately, then indexes embeddings in a background thread. Import shows **Indexing embeddings** (including the first FastEmbed model download) until status is **Ready**. Keyword search works as soon as parse finishes.
 

@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { AlertCircle, CheckCircle2, Link2, LoaderCircle } from "lucide-react"
+import { Link2, LoaderCircle } from "lucide-react"
 
+import { ImportError, type IndexBannerState } from "@/components/import/import-status"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -13,12 +14,16 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { getImportJob, importChatGPTShare } from "@/lib/api"
+import { getImportJob, importShareLink } from "@/lib/api"
 import type { ImportStatusResponse, ParseJobSuccess } from "@/types/import"
 
 const INDEX_POLL_MS = 900
 
-export function ShareLinkImporter() {
+type ShareLinkImporterProps = {
+  onStatusChange?: (state: IndexBannerState | null) => void
+}
+
+export function ShareLinkImporter({ onStatusChange }: ShareLinkImporterProps) {
   const [url, setUrl] = useState("")
   const [state, setState] = useState<"idle" | "importing" | "success" | "error">("idle")
   const [error, setError] = useState<string | null>(null)
@@ -32,12 +37,28 @@ export function ShareLinkImporter() {
   const ready = currentStatus === "ready" || currentStatus === "completed"
   const keywordReady = ready || currentStatus === "parsed"
 
+  useEffect(() => {
+    if (state !== "success") {
+      onStatusChange?.(null)
+      return
+    }
+    onStatusChange?.({
+      indexing,
+      ready,
+      keywordReady,
+      indexError: indexStatus?.index_error ?? null,
+      embeddingStatus: indexStatus?.embedding_status ?? null,
+      embeddingDetail: indexStatus?.embedding_status_detail ?? null,
+    })
+  }, [state, indexing, ready, keywordReady, indexStatus, onStatusChange])
+
   const reset = () => {
     setUrl("")
     setState("idle")
     setError(null)
     setResult(null)
     setIndexStatus(null)
+    onStatusChange?.(null)
   }
 
   const startImport = async () => {
@@ -50,7 +71,7 @@ export function ShareLinkImporter() {
     setIndexStatus(null)
 
     try {
-      const response = await importChatGPTShare(trimmed)
+      const response = await importShareLink(trimmed)
       setResult(response)
       setState("success")
       if (response.importId) {
@@ -83,13 +104,12 @@ export function ShareLinkImporter() {
   }
 
   return (
-    <Card className="border-border bg-card shadow-none">
+    <Card className="h-full border-border bg-card shadow-none">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium">Share link</CardTitle>
         <CardDescription>
-          In ChatGPT, open a chat → Share → Copy link, then paste it here.
-          Sharing makes that snapshot public to anyone with the link; you can
-          turn sharing off in ChatGPT after importing.
+          In ChatGPT or Claude, open a chat → Share → Copy link, then paste it
+          here. One public snapshot becomes one local conversation.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -102,7 +122,7 @@ export function ShareLinkImporter() {
               onKeyDown={(event) => {
                 if (event.key === "Enter") void startImport()
               }}
-              placeholder="https://chatgpt.com/share/..."
+              placeholder="https://chatgpt.com/share/... or https://claude.ai/share/..."
               className="pl-8"
               disabled={state === "importing" || indexing}
               autoComplete="off"
@@ -125,12 +145,7 @@ export function ShareLinkImporter() {
           </div>
         )}
 
-        {state === "error" && error && (
-          <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <p>{error}</p>
-          </div>
-        )}
+        {state === "error" && error && <ImportError kind="share" message={error} />}
 
         {result && state === "success" && (
           <div className="flex flex-col gap-3">
@@ -149,45 +164,18 @@ export function ShareLinkImporter() {
               </div>
             </div>
 
-            {indexing && (
-              <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-sm">
-                <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin" />
-                <div>
-                  <p className="font-medium">Indexing embeddings</p>
-                  <p className="text-xs text-muted-foreground">
-                    Keyword search is already available.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {indexStatus?.index_error && (
-              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <p>{indexStatus.index_error}</p>
-              </div>
-            )}
-
-            {keywordReady && !indexing && (
-              <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-sm">
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-foreground" />
-                <div>
-                  <p className="font-medium">
-                    {ready ? "Chat imported" : "Imported — keyword search ready"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Stored locally. Import another share link whenever you want.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Link
-                href="/conversations"
+                href="/"
                 className="inline-flex h-8 w-fit items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/80"
               >
-                Open conversations
+                Open Dashboard
+              </Link>
+              <Link
+                href="/ask"
+                className="inline-flex h-8 w-fit items-center rounded-lg border border-border px-2.5 text-sm hover:bg-muted"
+              >
+                Ask Jistory
               </Link>
               <Button type="button" variant="outline" onClick={reset}>
                 Import another

@@ -1,0 +1,55 @@
+[
+  {
+    "uuid": "8f3a2b1c-4d5e-6789-abcd-ef0123456789",
+    "name": "Postgres vs MongoDB for metrics",
+    "summary": "",
+    "model": "claude-sonnet-4-6",
+    "created_at": "2026-02-14T10:04:22.000Z",
+    "updated_at": "2026-02-14T10:22:41.000Z",
+    "is_starred": false,
+    "project_uuid": null,
+    "chat_messages": [
+      {
+        "uuid": "msg-human-1",
+        "text": "Should we store metrics in Postgres or MongoDB?",
+        "content": [
+          {
+            "type": "text",
+            "text": "Should we store metrics in Postgres or MongoDB?"
+          }
+        ],
+        "sender": "human",
+        "index": 0,
+        "created_at": "2026-02-14T10:04:22.000Z",
+        "updated_at": "2026-02-14T10:04:22.000Z",
+        "attachments": [],
+        "files": [],
+        "parent_message_uuid": null
+      },
+      {
+        "uuid": "msg-asst-1",
+        "text": "",
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "Compare operational simplicity and query patterns."
+          },
+          {
+            "type": "text",
+            "text": "Use Postgres for metrics if you need joins and retention policies. MongoDB is a weaker fit here."
+          }
+        ],
+        "sender": "assistant",
+        "index": 1,
+        "created_at": "2026-02-14T10:05:10.000Z",
+        "updated_at": "2026-02-14T10:05:10.000Z",
+        "attachments": [],
+        "files": [],
+        "parent_message_uuid": "msg-human-1"
+      }
+    ],
+    "account": {
+      "uuid": "acct-1"
+    }
+  }
+]

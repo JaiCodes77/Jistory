@@ -1,4 +1,4 @@
-"""Import a public ChatGPT share link into SQLite."""
+"""Import a public ChatGPT or Claude share link into SQLite."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -16,6 +17,11 @@ from app.imports.chatgpt.share import (
     parse_share_url,
     parsed_conversation_from_share,
 )
+from app.imports.claude.share import fetch_share_html as fetch_claude_html
+from app.imports.claude.share import fetch_snapshot_json as fetch_claude_snapshot
+from app.imports.claude.share import parse_share_html as parse_claude_html
+from app.imports.claude.share import parse_share_url as parse_claude_url
+from app.imports.claude.share import parsed_conversation_from_share as parsed_claude_conversation
 from app.imports.extractor import allocate_import_directory, cleanup_directory
 from app.imports.parse_service import ParseService
 from app.imports.validators import ImportValidationError
@@ -36,7 +42,44 @@ class ShareImportService:
         html = fetch_share_html(canonical)
         payload = parse_share_html(html)
         parsed_conversation_from_share(payload)
+        return self._persist_and_parse(
+            canonical=canonical,
+            share_id=share_id,
+            payload=payload,
+            source=ImportSource.CHATGPT,
+            filename=f"share-{share_id}.json",
+            notes=f"Imported from public share link {canonical}.",
+        )
 
+    def import_claude_share_url(self, url: str) -> ParseJobResponse:
+        canonical, share_id = parse_claude_url(url)
+        html = fetch_claude_html(canonical)
+        try:
+            payload = parse_claude_html(html)
+        except ImportValidationError as exc:
+            if exc.code != "share_parse_failed":
+                raise
+            payload = fetch_claude_snapshot(share_id)
+        parsed_claude_conversation(payload)
+        return self._persist_and_parse(
+            canonical=canonical,
+            share_id=share_id,
+            payload=payload,
+            source=ImportSource.CLAUDE,
+            filename=f"claude-share-{share_id}.json",
+            notes=f"Imported from public Claude share link {canonical}.",
+        )
+
+    def _persist_and_parse(
+        self,
+        *,
+        canonical: str,
+        share_id: str,
+        payload: dict[str, Any],
+        source: ImportSource,
+        filename: str,
+        notes: str,
+    ) -> ParseJobResponse:
         import_dir = allocate_import_directory(self.imports_root)
         job: ImportJob | None = None
         try:
@@ -50,19 +93,19 @@ class ShareImportService:
                 relative_folder = str(import_dir)
 
             job = ImportJob(
-                source=ImportSource.CHATGPT.value,
+                source=source.value,
                 imported_at=datetime.now(timezone.utc),
                 folder_path=relative_folder,
                 status=ImportStatus.UPLOADED.value,
                 file_size=len(snapshot.encode("utf-8")),
-                original_filename=f"share-{share_id}.json",
-                notes=f"Imported from public share link {canonical}.",
+                original_filename=filename,
+                notes=notes,
             )
             self.db.add(job)
             self.db.commit()
             self.db.refresh(job)
 
-            logger.info("Share import stored — job=%s share_id=%s", job.id, share_id)
+            logger.info("Share import stored — job=%s share_id=%s source=%s", job.id, share_id, source.value)
             return ParseService(db=self.db, settings=self.settings).parse_import_job(job.id)
         except ImportValidationError:
             if job is None:

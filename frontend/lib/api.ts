@@ -46,9 +46,32 @@ export function formatImportedAt(value: string | null | undefined): string {
 
 export function formatDate(value: string | null | undefined): string {
   if (!value) return "—"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
+  const date = parseDateValue(value)
+  if (!date) return value
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date)
+}
+
+export function formatDayLabel(
+  value: string | null | undefined,
+  style: "short" | "full" = "short"
+): string {
+  if (!value) return "—"
+  const date = parseDateValue(value)
+  if (!date) return value
+  return new Intl.DateTimeFormat(
+    undefined,
+    style === "full"
+      ? { month: "short", day: "numeric", year: "numeric" }
+      : { month: "short", day: "numeric" }
+  ).format(date)
+}
+
+function parseDateValue(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+  const date = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
 }
 
 export function conversationTitle(title: string | null | undefined): string {
@@ -56,23 +79,32 @@ export function conversationTitle(title: string | null | undefined): string {
   return trimmed ? trimmed : "Untitled conversation"
 }
 
-type UploadChatGPTOptions = {
+type UploadExportOptions = {
   file: File
+  source?: "chatgpt" | "claude"
   onProgress?: (percent: number) => void
   signal?: AbortSignal
 }
 
-export function uploadChatGPTExport({
+export function uploadChatGPTExport(
+  options: Omit<UploadExportOptions, "source">
+): Promise<ImportJobSuccess> {
+  return uploadExport({ ...options, source: "chatgpt" })
+}
+
+export function uploadExport({
   file,
+  source = "chatgpt",
   onProgress,
   signal,
-}: UploadChatGPTOptions): Promise<ImportJobSuccess> {
+}: UploadExportOptions): Promise<ImportJobSuccess> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     const formData = new FormData()
     formData.append("file", file)
+    const path = source === "claude" ? "/import/claude" : "/import/chatgpt"
 
-    xhr.open("POST", getApiUrl("/import/chatgpt"))
+    xhr.open("POST", getApiUrl(path))
 
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable) return
@@ -138,8 +170,22 @@ export async function parseImportJob(importId: string): Promise<ParseJobSuccess>
   return apiFetch<ParseJobSuccess>(`/import/${importId}/parse`, { method: "POST" })
 }
 
+export function detectShareSource(url: string): "chatgpt" | "claude" {
+  const text = url.trim().toLowerCase()
+  if (text.includes("claude.ai")) return "claude"
+  return "chatgpt"
+}
+
 export async function importChatGPTShare(url: string): Promise<ParseJobSuccess> {
-  return apiFetch<ParseJobSuccess>("/import/chatgpt/share", {
+  return importShareLink(url)
+}
+
+export async function importShareLink(url: string): Promise<ParseJobSuccess> {
+  const path =
+    detectShareSource(url) === "claude"
+      ? "/import/claude/share"
+      : "/import/chatgpt/share"
+  return apiFetch<ParseJobSuccess>(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),

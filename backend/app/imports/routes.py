@@ -93,11 +93,35 @@ def import_chatgpt_share(
     settings: Settings = Depends(get_settings),
 ) -> ParseJobResponse | JSONResponse:
     """Fetch a public ChatGPT share page and store that conversation locally."""
-    service = ShareImportService(db=db, settings=settings)
+    return _import_share(payload.url, db=db, settings=settings, claude=False)
+
+
+@router.post(
+    "/claude",
+    response_model=ImportJobResponse,
+    responses={
+        400: {"model": ImportErrorResponse},
+        413: {"model": ImportErrorResponse},
+        503: {"model": ImportErrorResponse},
+    },
+)
+async def import_claude_export(
+    file: UploadFile = File(..., description="Claude data export ZIP file"),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ImportJobResponse | JSONResponse:
+    """
+    Upload and store a Claude data export ZIP.
+
+    Validates the archive, extracts it under data/imports/, and records an ImportJob.
+    Does not parse conversations.
+    """
+    service = ImportService(db=db, settings=settings)
+
     try:
-        return service.import_share_url(payload.url)
+        return await service.import_claude_zip(file)
     except ImportValidationError as exc:
-        status_code = 404 if exc.code in {"share_not_found", "import_not_found"} else 400
+        status_code = 413 if exc.code == "file_too_large" else 400
         return JSONResponse(
             status_code=status_code,
             content=ImportErrorResponse(error=exc.message, code=exc.code).model_dump(),
@@ -106,10 +130,28 @@ def import_chatgpt_share(
         return JSONResponse(
             status_code=503,
             content=ImportErrorResponse(
-                error="Server unavailable or failed to import the share link. Please try again.",
+                error="Server unavailable or failed to process the upload. Please try again.",
                 code="server_unavailable",
             ).model_dump(),
         )
+
+
+@router.post(
+    "/claude/share",
+    response_model=ParseJobResponse,
+    responses={
+        400: {"model": ImportErrorResponse},
+        404: {"model": ImportErrorResponse},
+        503: {"model": ImportErrorResponse},
+    },
+)
+def import_claude_share(
+    payload: ShareImportRequest,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ParseJobResponse | JSONResponse:
+    """Fetch a public Claude share page and store that conversation locally."""
+    return _import_share(payload.url, db=db, settings=settings, claude=True)
 
 
 @router.post(
@@ -127,7 +169,7 @@ def parse_import_job(
     settings: Settings = Depends(get_settings),
 ) -> ParseJobResponse | JSONResponse:
     """
-    Parse an uploaded ChatGPT export into normalized Conversation/Message rows.
+    Parse an uploaded export into normalized Conversation/Message rows.
 
     Idempotent: re-running replaces prior parse results for the same ImportJob.
     """
@@ -170,3 +212,31 @@ def get_import_job(
             ).model_dump(),
         )
     return import_job_response(job)
+
+
+def _import_share(
+    url: str,
+    *,
+    db: Session,
+    settings: Settings,
+    claude: bool,
+) -> ParseJobResponse | JSONResponse:
+    service = ShareImportService(db=db, settings=settings)
+    try:
+        if claude:
+            return service.import_claude_share_url(url)
+        return service.import_share_url(url)
+    except ImportValidationError as exc:
+        status_code = 404 if exc.code in {"share_not_found", "import_not_found"} else 400
+        return JSONResponse(
+            status_code=status_code,
+            content=ImportErrorResponse(error=exc.message, code=exc.code).model_dump(),
+        )
+    except Exception:
+        return JSONResponse(
+            status_code=503,
+            content=ImportErrorResponse(
+                error="Server unavailable or failed to import the share link. Please try again.",
+                code="server_unavailable",
+            ).model_dump(),
+        )

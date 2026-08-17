@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fastapi import UploadFile
 
-# ChatGPT exports always include conversation data under one of these patterns.
+# ChatGPT and Claude exports include conversation data under one of these patterns.
 REQUIRED_CONVERSATION_NAMES = ("conversations.json",)
 REQUIRED_CONVERSATION_PREFIX = "conversations-"
 REQUIRED_CONVERSATION_SUFFIX = ".json"
@@ -26,14 +26,14 @@ class ImportValidationError(Exception):
         self.code = code
 
 
-def validate_filename(filename: str | None) -> str:
+def validate_filename(filename: str | None, *, source_label: str = "export") -> str:
     if not filename:
         raise ImportValidationError("No file was provided.", code="missing_file")
 
     name = Path(filename).name
     if not name.lower().endswith(".zip"):
         raise ImportValidationError(
-            "File must be a ChatGPT export ZIP (.zip).",
+            f"File must be a {source_label} ZIP (.zip).",
             code="invalid_type",
         )
     return name
@@ -69,6 +69,14 @@ def validate_content_type(content_type: str | None) -> None:
 
 
 def is_chatgpt_conversation_file(name: str) -> bool:
+    return _is_conversations_json(name)
+
+
+def is_claude_conversation_file(name: str) -> bool:
+    return _is_conversations_json(name)
+
+
+def _is_conversations_json(name: str) -> bool:
     basename = Path(name).name.lower()
     if basename in REQUIRED_CONVERSATION_NAMES:
         return True
@@ -110,6 +118,21 @@ def validate_chatgpt_export_contents(member_names: list[str]) -> list[str]:
     if not conversation_files:
         raise ImportValidationError(
             "This ZIP does not look like a ChatGPT export. "
+            "Expected conversations.json (or conversations-*.json).",
+            code="missing_export_files",
+        )
+
+    return sorted(set(conversation_files))
+
+
+def validate_claude_export_contents(member_names: list[str]) -> list[str]:
+    """Ensure the archive looks like a Claude data export."""
+    basenames = [Path(name).name for name in member_names if not name.endswith("/")]
+    conversation_files = [name for name in basenames if is_claude_conversation_file(name)]
+
+    if not conversation_files:
+        raise ImportValidationError(
+            "This ZIP does not look like a Claude export. "
             "Expected conversations.json (or conversations-*.json).",
             code="missing_export_files",
         )

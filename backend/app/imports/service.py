@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from app.imports.validators import (
     looks_like_zip,
     read_upload_with_limit,
     validate_chatgpt_export_contents,
+    validate_claude_export_contents,
     validate_content_type,
     validate_filename,
     zip_member_names,
@@ -30,7 +32,30 @@ class ImportService:
         self.imports_root = Path(settings.imports_dir)
 
     async def import_chatgpt_zip(self, upload: UploadFile) -> ImportJobResponse:
-        filename = validate_filename(upload.filename)
+        return await self._import_zip(
+            upload,
+            source=ImportSource.CHATGPT,
+            source_label="ChatGPT export",
+            validate_contents=validate_chatgpt_export_contents,
+        )
+
+    async def import_claude_zip(self, upload: UploadFile) -> ImportJobResponse:
+        return await self._import_zip(
+            upload,
+            source=ImportSource.CLAUDE,
+            source_label="Claude export",
+            validate_contents=validate_claude_export_contents,
+        )
+
+    async def _import_zip(
+        self,
+        upload: UploadFile,
+        *,
+        source: ImportSource,
+        source_label: str,
+        validate_contents: Callable[[list[str]], list[str]],
+    ) -> ImportJobResponse:
+        filename = validate_filename(upload.filename, source_label=source_label)
         validate_content_type(upload.content_type)
 
         data = await read_upload_with_limit(upload, self.settings.max_import_bytes)
@@ -49,7 +74,7 @@ class ImportService:
             zip_path.write_bytes(data)
 
             member_names = zip_member_names(zip_path)
-            conversation_files = validate_chatgpt_export_contents(member_names)
+            conversation_files = validate_contents(member_names)
 
             extracted = extract_zip(zip_path, import_dir)
 
@@ -63,7 +88,7 @@ class ImportService:
             )
 
             job = ImportJob(
-                source=ImportSource.CHATGPT.value,
+                source=source.value,
                 imported_at=datetime.now(timezone.utc),
                 folder_path=relative_folder,
                 status=ImportStatus.UPLOADED.value,
@@ -89,6 +114,7 @@ class ImportService:
         except ImportValidationError as exc:
             cleanup_directory(import_dir)
             self._record_failed_job(
+                source=source,
                 filename=filename,
                 file_size=len(data),
                 folder_path="",
@@ -98,6 +124,7 @@ class ImportService:
         except Exception as exc:
             cleanup_directory(import_dir)
             self._record_failed_job(
+                source=source,
                 filename=filename,
                 file_size=len(data),
                 folder_path="",
@@ -111,6 +138,7 @@ class ImportService:
     def _record_failed_job(
         self,
         *,
+        source: ImportSource,
         filename: str,
         file_size: int,
         folder_path: str,
@@ -118,7 +146,7 @@ class ImportService:
     ) -> None:
         try:
             failed = ImportJob(
-                source=ImportSource.CHATGPT.value,
+                source=source.value,
                 imported_at=datetime.now(timezone.utc),
                 folder_path=folder_path or "failed",
                 status=ImportStatus.FAILED.value,

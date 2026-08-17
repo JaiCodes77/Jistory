@@ -1,6 +1,6 @@
 """Parser interfaces for conversation export formats.
 
-Future parsers (Claude, Gemini, Cursor) should implement ConversationParser
+Future parsers (Gemini, Cursor) should implement ConversationParser
 without changing persistence or API layers.
 """
 

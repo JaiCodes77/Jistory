@@ -49,3 +49,23 @@ export function formatEmbeddingStatus(status: string | null | undefined): string
       return "Embedding model idle"
   }
 }
+
+export function importNextStep(
+  kind: "upload" | "parse" | "index" | "share",
+  message?: string | null
+): string {
+  const text = (message || "").toLowerCase()
+  if (text.includes("unavailable") || text.includes("port 8000")) {
+    return "Start the Jistory backend, then retry."
+  }
+  if (kind === "share") {
+    return "Paste a public chatgpt.com/share/… or claude.ai/share/… link, or upload an export ZIP instead."
+  }
+  if (kind === "upload") {
+    return "Choose a ChatGPT or Claude export .zip, then try again."
+  }
+  if (kind === "parse") {
+    return "The file is already saved locally. Retry parse to continue."
+  }
+  return "Keyword search may already work. Open Conversations, or retry parse to re-index embeddings."
+}

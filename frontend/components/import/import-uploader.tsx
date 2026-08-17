@@ -2,14 +2,14 @@
 
 import { useCallback, useRef, useState } from "react"
 import Link from "next/link"
-import {
-  AlertCircle,
-  CheckCircle2,
-  FileArchive,
-  LoaderCircle,
-  Upload,
-} from "lucide-react"
+import { CheckCircle2, FileArchive, LoaderCircle, Upload } from "lucide-react"
 
+import {
+  ImportError,
+  ImportIndexBanner,
+  type IndexBannerState,
+} from "@/components/import/import-status"
+import { ShareLinkImporter } from "@/components/import/share-link-importer"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -18,13 +18,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { ShareLinkImporter } from "@/components/import/share-link-importer"
 import {
   formatBytes,
   formatImportedAt,
   getImportJob,
   parseImportJob,
-  uploadChatGPTExport,
+  uploadExport,
 } from "@/lib/api"
 import { formatImportStatus } from "@/lib/labels"
 import { cn } from "@/lib/utils"
@@ -41,6 +40,7 @@ const INDEX_POLL_MS = 900
 export function ImportUploader() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
+  const [zipSource, setZipSource] = useState<"chatgpt" | "claude">("chatgpt")
   const [state, setState] = useState<UploadState>("idle")
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -51,6 +51,7 @@ export function ImportUploader() {
   const [parseError, setParseError] = useState<string | null>(null)
   const [parseResult, setParseResult] = useState<ParseJobSuccess | null>(null)
   const [indexStatus, setIndexStatus] = useState<ImportStatusResponse | null>(null)
+  const [shareStatus, setShareStatus] = useState<IndexBannerState | null>(null)
 
   const resetSelection = useCallback(() => {
     setFile(null)
@@ -77,7 +78,11 @@ export function ImportUploader() {
       setIndexStatus(null)
       setProgress(0)
       setState("error")
-      setError("Please select a ChatGPT export ZIP file (.zip).")
+      setError(
+        zipSource === "claude"
+          ? "Please select a Claude export ZIP file (.zip)."
+          : "Please select a ChatGPT export ZIP file (.zip)."
+      )
       return
     }
 
@@ -90,7 +95,7 @@ export function ImportUploader() {
     setError(null)
     setProgress(0)
     setState("selected")
-  }, [])
+  }, [zipSource])
 
   const onInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const next = event.target.files?.[0] ?? null
@@ -102,36 +107,6 @@ export function ImportUploader() {
     setDragActive(false)
     const next = event.dataTransfer.files?.[0] ?? null
     selectFile(next)
-  }
-
-  const startUpload = async () => {
-    if (!file || state === "uploading") return
-
-    setState("uploading")
-    setProgress(0)
-    setError(null)
-    setResult(null)
-    setParseState("idle")
-    setParseError(null)
-    setParseResult(null)
-    setIndexStatus(null)
-
-    try {
-      const response = await uploadChatGPTExport({
-        file,
-        onProgress: setProgress,
-      })
-      setResult(response)
-      setProgress(100)
-      setState("success")
-    } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Upload failed. Please try again."
-      setError(message)
-      setState("error")
-    }
   }
 
   const pollIndex = async (importId: string) => {
@@ -152,28 +127,52 @@ export function ImportUploader() {
     throw new Error("Indexing is taking too long. Keyword search may already work.")
   }
 
-  const startParse = async () => {
-    if (!result?.importId || parseState === "parsing") return
-
+  const runParse = async (importId: string) => {
     setParseState("parsing")
     setParseError(null)
     setIndexStatus(null)
 
     try {
-      const response = await parseImportJob(result.importId)
+      const response = await parseImportJob(importId)
       setParseResult(response)
-      setResult((prev) =>
-        prev ? { ...prev, status: response.status } : prev
-      )
+      setResult((prev) => (prev ? { ...prev, status: response.status } : prev))
       setParseState("success")
-      await pollIndex(result.importId)
+      await pollIndex(importId)
     } catch (err) {
       const message =
-        err instanceof Error
-          ? err.message
-          : "Failed to parse conversations."
+        err instanceof Error ? err.message : "Failed to parse conversations."
       setParseError(message)
       setParseState("error")
+    }
+  }
+
+  const startUpload = async () => {
+    if (!file || state === "uploading") return
+
+    setState("uploading")
+    setProgress(0)
+    setError(null)
+    setResult(null)
+    setParseState("idle")
+    setParseError(null)
+    setParseResult(null)
+    setIndexStatus(null)
+
+    try {
+      const response = await uploadExport({
+        file,
+        source: zipSource,
+        onProgress: setProgress,
+      })
+      setResult(response)
+      setProgress(100)
+      setState("success")
+      await runParse(response.importId)
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Upload failed. Please try again."
+      setError(message)
+      setState("error")
     }
   }
 
@@ -182,157 +181,215 @@ export function ImportUploader() {
     parseState === "success" &&
     (currentStatus === "indexing" || currentStatus === "processing")
   const indexError = indexStatus?.index_error
-  const ready =
-    currentStatus === "ready" || currentStatus === "completed"
+  const ready = currentStatus === "ready" || currentStatus === "completed"
   const keywordReady = ready || currentStatus === "parsed"
 
+  const zipBanner: IndexBannerState | null =
+    parseState === "success" || indexing || Boolean(indexError)
+      ? {
+          indexing,
+          ready,
+          keywordReady,
+          indexError: indexError ?? null,
+          embeddingStatus: indexStatus?.embedding_status ?? null,
+          embeddingDetail: indexStatus?.embedding_status_detail ?? null,
+        }
+      : null
+
+  const pageBanner =
+    zipBanner?.indexing || zipBanner?.indexError
+      ? zipBanner
+      : shareStatus?.indexing || shareStatus?.indexError
+        ? shareStatus
+        : zipBanner?.keywordReady
+          ? zipBanner
+          : shareStatus
+
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-10">
-      <div className="flex flex-col gap-1">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
+      <div className="flex flex-col gap-2">
         <h2 className="text-lg font-medium tracking-tight">Import</h2>
         <p className="text-sm text-muted-foreground">
-          Paste a ChatGPT share link to import one chat now, or upload a data
-          export ZIP when it arrives.
+          Paste a ChatGPT or Claude share link, or upload an export ZIP. Both
+          land in the same local library.
         </p>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+          <span>1. Upload or paste</span>
+          <span>2. Parse</span>
+          <span>3. Keyword search ready</span>
+          <span>4. Embeddings indexing</span>
+        </div>
       </div>
 
-      <ShareLinkImporter />
+      {pageBanner && <ImportIndexBanner state={pageBanner} />}
 
-      <Card className="border-border bg-card shadow-none">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">ChatGPT export</CardTitle>
-          <CardDescription>
-            Full history still uses ChatGPT → Settings → Data controls → Export
-            data. That ZIP can take a while to arrive.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div
-            onDragEnter={(event) => {
-              event.preventDefault()
-              setDragActive(true)
-            }}
-            onDragOver={(event) => {
-              event.preventDefault()
-              setDragActive(true)
-            }}
-            onDragLeave={(event) => {
-              event.preventDefault()
-              setDragActive(false)
-            }}
-            onDrop={onDrop}
-            className={cn(
-              "flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed px-6 py-12 text-center transition-colors",
-              dragActive
-                ? "border-foreground/40 bg-muted/40"
-                : "border-border bg-background",
-              state === "uploading" && "pointer-events-none opacity-70"
-            )}
-          >
-            <div className="flex size-10 items-center justify-center rounded-md border border-border bg-muted/40">
-              <Upload className="size-4 text-muted-foreground" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium">Drop your ZIP here</p>
-              <p className="text-xs text-muted-foreground">
-                or choose a file from your computer
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={state === "uploading" || parseState === "parsing" || indexing}
-              onClick={() => inputRef.current?.click()}
-            >
-              Select ZIP
-            </Button>
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".zip,application/zip"
-              className="hidden"
-              onChange={onInputChange}
-            />
-          </div>
+      <div className="grid items-stretch gap-4 lg:grid-cols-2">
+        <ShareLinkImporter onStatusChange={setShareStatus} />
 
-          {file && (
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <FileArchive className="size-4 shrink-0 text-muted-foreground" />
-                <div className="min-w-0">
-                  <p className="truncate text-sm">{file.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatBytes(file.size)}
-                  </p>
-                </div>
-              </div>
-              {state !== "uploading" && parseState !== "parsing" && !indexing && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  onClick={resetSelection}
-                >
-                  Clear
-                </Button>
+        <Card className="h-full border-border bg-card shadow-none">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Export ZIP</CardTitle>
+            <CardDescription>
+              {zipSource === "claude"
+                ? "Claude → Settings → Privacy → Export data. Drop the ZIP here; parse starts automatically after upload."
+                : "ChatGPT → Settings → Data controls → Export data. Drop the ZIP here; parse starts automatically after upload."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex gap-1 rounded-lg border border-border p-1">
+              <Button
+                type="button"
+                size="sm"
+                variant={zipSource === "chatgpt" ? "secondary" : "ghost"}
+                disabled={state === "uploading" || parseState === "parsing" || indexing}
+                onClick={() => setZipSource("chatgpt")}
+              >
+                ChatGPT
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={zipSource === "claude" ? "secondary" : "ghost"}
+                disabled={state === "uploading" || parseState === "parsing" || indexing}
+                onClick={() => setZipSource("claude")}
+              >
+                Claude
+              </Button>
+            </div>
+            <div
+              onDragEnter={(event) => {
+                event.preventDefault()
+                setDragActive(true)
+              }}
+              onDragOver={(event) => {
+                event.preventDefault()
+                setDragActive(true)
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault()
+                setDragActive(false)
+              }}
+              onDrop={onDrop}
+              className={cn(
+                "flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed px-6 py-10 text-center transition-colors",
+                dragActive
+                  ? "border-foreground/40 bg-muted/40"
+                  : "border-border bg-background",
+                state === "uploading" && "pointer-events-none opacity-70"
               )}
-            </div>
-          )}
-
-          {state === "uploading" && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5">
-                  <LoaderCircle className="size-3.5 animate-spin" />
-                  Uploading…
-                </span>
-                <span>{progress}%</span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full bg-primary transition-[width] duration-150"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {state === "error" && error && (
-            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              <p>{error}</p>
-            </div>
-          )}
-
-          {state === "success" && (
-            <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-sm">
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-foreground" />
-              <p>Import completed successfully. Export saved locally.</p>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              disabled={!file || state === "uploading" || parseState === "parsing" || indexing}
-              onClick={startUpload}
             >
-              {state === "uploading" ? "Uploading…" : "Upload export"}
-            </Button>
-            {(state === "success" || state === "error") && (
+              <div className="flex size-10 items-center justify-center rounded-md border border-border bg-muted/40">
+                <Upload className="size-4 text-muted-foreground" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium">Drop your ZIP here</p>
+                <p className="text-xs text-muted-foreground">
+                  or choose a file from your computer
+                </p>
+              </div>
               <Button
                 type="button"
                 variant="outline"
-                disabled={parseState === "parsing" || indexing}
-                onClick={resetSelection}
+                size="sm"
+                disabled={state === "uploading" || parseState === "parsing" || indexing}
+                onClick={() => inputRef.current?.click()}
               >
-                Import another
+                Select ZIP
               </Button>
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".zip,application/zip"
+                className="hidden"
+                onChange={onInputChange}
+              />
+            </div>
+
+            {file && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <FileArchive className="size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatBytes(file.size)}
+                    </p>
+                  </div>
+                </div>
+                {state !== "uploading" && parseState !== "parsing" && !indexing && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    onClick={resetSelection}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
             )}
-          </div>
-        </CardContent>
-      </Card>
+
+            {state === "uploading" && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Uploading…</span>
+                  <span>{progress}%</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-primary transition-[width] duration-150"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {parseState === "parsing" && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <LoaderCircle className="size-3.5 animate-spin" />
+                Parsing conversations… keyword search comes next.
+              </div>
+            )}
+
+            {state === "error" && error && <ImportError kind="upload" message={error} />}
+            {parseState === "error" && parseError && (
+              <ImportError kind="parse" message={parseError} />
+            )}
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                disabled={!file || state === "uploading" || parseState === "parsing" || indexing}
+                onClick={() => {
+                  if (state === "success" && parseState === "error" && result?.importId) {
+                    void runParse(result.importId)
+                    return
+                  }
+                  void startUpload()
+                }}
+              >
+                {state === "uploading"
+                  ? "Uploading…"
+                  : parseState === "parsing"
+                    ? "Parsing…"
+                    : parseState === "error"
+                      ? "Retry parse"
+                      : "Upload export"}
+              </Button>
+              {(state === "success" || state === "error") && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={parseState === "parsing" || indexing}
+                  onClick={resetSelection}
+                >
+                  Import another
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {result && state === "success" && (
         <Card className="border-border bg-card shadow-none">
@@ -357,46 +414,6 @@ export function ImportUploader() {
               <SummaryItem label="Source" value={result.source} />
               <SummaryItem label="Import ID" value={result.importId} mono />
             </dl>
-
-            {parseState !== "success" && (
-              <div className="flex flex-col gap-3 border-t border-border pt-4">
-                <div className="flex flex-col gap-1">
-                  <p className="text-sm font-medium">Next step</p>
-                  <p className="text-xs text-muted-foreground">
-                    Parse the export into normalized conversations and messages.
-                    Embeddings index in the background after parse.
-                  </p>
-                </div>
-
-                {parseState === "parsing" && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <LoaderCircle className="size-3.5 animate-spin" />
-                    Parsing conversations…
-                  </div>
-                )}
-
-                {parseState === "error" && parseError && (
-                  <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
-                    <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                    <p>{parseError}</p>
-                  </div>
-                )}
-
-                <div>
-                  <Button
-                    type="button"
-                    disabled={parseState === "parsing"}
-                    onClick={startParse}
-                  >
-                    {parseState === "parsing"
-                      ? "Parsing…"
-                      : parseState === "error"
-                        ? "Retry parse"
-                        : "Parse Conversations"}
-                  </Button>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
       )}
@@ -405,7 +422,10 @@ export function ImportUploader() {
         <Card className="border-border bg-card shadow-none">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">Imported</CardTitle>
-            <CardDescription>Normalized and stored in SQLite.</CardDescription>
+            <CardDescription>
+              Normalized and stored in SQLite. Keyword search is available while
+              embeddings finish indexing.
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -427,28 +447,6 @@ export function ImportUploader() {
               </p>
             )}
 
-            {indexing && (
-              <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-sm">
-                <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin" />
-                <div>
-                  <p className="font-medium">Indexing embeddings</p>
-                  <p className="text-xs text-muted-foreground">
-                    {indexStatus?.embedding_status === "downloading"
-                      ? indexStatus.embedding_status_detail ||
-                        "Downloading the local embedding model (first run)…"
-                      : "Keyword search is already available. Semantic search will turn on when indexing finishes."}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {indexError && (
-              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <p>{indexError}</p>
-              </div>
-            )}
-
             {keywordReady && !indexing && (
               <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-sm">
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-foreground" />
@@ -457,20 +455,32 @@ export function ImportUploader() {
                     {ready ? "Ready for Search and Ask" : "Ready for keyword search"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {ready
-                      ? "Conversations are stored locally with keyword and semantic indexes."
-                      : "Conversations are stored locally. Semantic indexing did not finish, but Search still works."}
+                    Next: open the Dashboard, then Ask and type @ to tag a chat.
                   </p>
                 </div>
               </div>
             )}
 
-            <Link
-              href="/conversations"
-              className="inline-flex h-8 w-fit items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/80"
-            >
-              Browse conversations
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/"
+                className="inline-flex h-8 w-fit items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/80"
+              >
+                Open Dashboard
+              </Link>
+              <Link
+                href="/ask"
+                className="inline-flex h-8 w-fit items-center rounded-lg border border-border px-2.5 text-sm hover:bg-muted"
+              >
+                Ask Jistory
+              </Link>
+              <Link
+                href="/conversations"
+                className="inline-flex h-8 w-fit items-center rounded-lg border border-border px-2.5 text-sm hover:bg-muted"
+              >
+                Browse conversations
+              </Link>
+            </div>
           </CardContent>
         </Card>
       )}

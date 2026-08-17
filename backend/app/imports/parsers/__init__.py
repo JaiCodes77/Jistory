@@ -13,10 +13,13 @@ def _registry() -> dict[str, type[ConversationParser]]:
     global PARSER_REGISTRY
     if PARSER_REGISTRY is None:
         from app.imports.parsers.chatgpt import ChatGPTParser
+        from app.imports.parsers.claude import ClaudeParser
 
         PARSER_REGISTRY = {
             "ChatGPT": ChatGPTParser,
             "chatgpt": ChatGPTParser,
+            "Claude": ClaudeParser,
+            "claude": ClaudeParser,
         }
     return PARSER_REGISTRY
 

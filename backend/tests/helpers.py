@@ -122,3 +122,105 @@ def share_html_for(conversation: dict[str, Any], *, legacy: bool = False) -> str
         f"<script>window.__reactRouterContext.streamController.enqueue({argument});</script>"
         "</body></html>"
     )
+
+
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
+
+
+def load_fixture_text(*parts: str) -> str:
+    return (FIXTURES_DIR.joinpath(*parts)).read_text(encoding="utf-8")
+
+
+def load_fixture_json(*parts: str) -> Any:
+    return json.loads(load_fixture_text(*parts))
+
+
+def claude_conversation(
+    *,
+    conversation_id: str = "claude-conv-1",
+    title: str | None = "Postgres vs MongoDB for metrics",
+    messages: list[tuple[str, str, str]] | None = None,
+    created_at: str | None = "2026-02-14T10:04:22.000Z",
+    deleted: bool = False,
+    public: bool | None = None,
+) -> dict:
+    if messages is None:
+        messages = [
+            ("msg-human", "human", "Should we store metrics in Postgres or MongoDB?"),
+            (
+                "msg-asst",
+                "assistant",
+                "Use Postgres for metrics if you need joins and retention policies.",
+            ),
+        ]
+
+    chat_messages = []
+    parent = None
+    for index, (msg_id, sender, text) in enumerate(messages):
+        chat_messages.append(
+            {
+                "uuid": msg_id,
+                "text": text if sender == "human" else "",
+                "content": [{"type": "text", "text": text}] if sender != "human" else [],
+                "sender": sender,
+                "index": index,
+                "created_at": created_at,
+                "parent_message_uuid": parent,
+            }
+        )
+        parent = msg_id
+
+    payload: dict[str, Any] = {
+        "uuid": conversation_id,
+        "name": title,
+        "created_at": created_at,
+        "updated_at": created_at,
+        "chat_messages": chat_messages,
+    }
+    if deleted:
+        payload["is_deleted"] = True
+    if public is not None:
+        payload["is_public"] = public
+        payload["snapshot_name"] = title
+        payload["conversation_uuid"] = conversation_id
+    return payload
+
+
+def claude_export_zip(conversations: list[dict], extra: dict[str, str] | None = None) -> bytes:
+    files: dict[str, str | bytes] = {
+        "conversations.json": json.dumps(conversations),
+        "users.json": json.dumps([{"uuid": "acct-1"}]),
+    }
+    if extra:
+        files.update(extra)
+    return zip_bytes(files)
+
+
+def write_claude_export_dir(path: Path, conversations: list[dict]) -> Path:
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "conversations.json").write_text(json.dumps(conversations), encoding="utf-8")
+    (path / "users.json").write_text("[]", encoding="utf-8")
+    return path
+
+
+def claude_share_html_for(conversation: dict[str, Any], *, login_wall: bool = False) -> str:
+    if login_wall:
+        return (
+            "<!doctype html><html><body>"
+            "<h1>Log in to Claude</h1>"
+            "<p>You must be signed in to continue.</p>"
+            '<a href="/login">Sign in</a>'
+            "</body></html>"
+        )
+    next_data = {
+        "props": {
+            "pageProps": {
+                "snapshot": conversation,
+            }
+        }
+    }
+    return (
+        "<!doctype html><html><body>"
+        f'<script id="__NEXT_DATA__" type="application/json">{json.dumps(next_data)}</script>'
+        "</body></html>"
+    )
