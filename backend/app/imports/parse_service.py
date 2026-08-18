@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import DATA_DIR, Settings
 from app.imports.chatgpt.persistence import persist_conversations
+from app.imports.extractor import resolve_import_directory
 from app.imports.parsers import UnknownSourceError, get_parser
 from app.imports.validators import ImportValidationError
 from app.models.import_job import PARSEABLE_STATUSES, ImportJob, ImportStatus
@@ -52,7 +53,7 @@ class ParseService:
             )
 
         import_dir = self._resolve_import_dir(job.folder_path)
-        if not import_dir.exists() or not import_dir.is_dir():
+        if import_dir is None or not import_dir.exists() or not import_dir.is_dir():
             raise ImportValidationError(
                 "Import folder not found. The export may have been removed.",
                 code="missing_folder",
@@ -163,41 +164,9 @@ class ParseService:
         except Exception:
             self.db.rollback()
 
-    def _resolve_import_dir(self, folder_path: str) -> Path:
-        imports_root = Path(self.settings.imports_dir).resolve()
-        data_root = DATA_DIR.resolve()
-        raw = Path(folder_path)
-        candidates = []
-        if raw.is_absolute():
-            candidates.append(raw.resolve())
-        else:
-            candidates.extend(
-                [
-                    (data_root / raw).resolve(),
-                    (imports_root / raw).resolve(),
-                    (imports_root / raw.name).resolve(),
-                ]
-            )
-
-        safe: list[Path] = []
-        for candidate in candidates:
-            try:
-                candidate.relative_to(imports_root)
-                safe.append(candidate)
-                continue
-            except ValueError:
-                pass
-            try:
-                candidate.relative_to(data_root)
-                safe.append(candidate)
-            except ValueError:
-                pass
-
-        for candidate in safe:
-            if candidate.exists() and candidate.is_dir():
-                return candidate
-
-        raise ImportValidationError(
-            "Import folder not found. The export may have been removed.",
-            code="missing_folder",
+    def _resolve_import_dir(self, folder_path: str) -> Path | None:
+        return resolve_import_directory(
+            folder_path,
+            imports_root=Path(self.settings.imports_dir),
+            data_root=DATA_DIR,
         )

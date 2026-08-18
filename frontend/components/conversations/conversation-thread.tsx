@@ -2,12 +2,16 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
+import { ExpandableMessage } from "@/components/conversations/expandable-message"
+import { ForgetButton } from "@/components/conversations/forget-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { CopyTextButton } from "@/components/ui/copy-text-button"
 import {
   conversationTitle,
+  forgetConversation,
   formatDate,
   formatImportedAt,
   getConversationMessages,
@@ -80,6 +84,7 @@ function scrollToMessage(id: string, attempts = 24) {
 }
 
 export function ConversationThread({ conversationId }: { conversationId: string }) {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const highlightId = searchParams.get("message")
   const listRef = useRef<HTMLDivElement>(null)
@@ -266,9 +271,19 @@ export function ConversationThread({ conversationId }: { conversationId: string 
 
       {conversation && (
         <div className="mb-4 shrink-0 border-b border-border pb-4">
-          <h2 className="text-lg font-medium tracking-tight">
-            {conversationTitle(conversation.title)}
-          </h2>
+          <div className="flex items-start justify-between gap-4">
+            <h2 className="text-lg font-medium tracking-tight">
+              {conversationTitle(conversation.title)}
+            </h2>
+            <ForgetButton
+              confirmCopy="This permanently deletes this conversation, its messages, and embeddings. Search and Ask will no longer use it."
+              onConfirm={async () => {
+                await forgetConversation(conversationId)
+                router.push("/conversations")
+                router.refresh()
+              }}
+            />
+          </div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
             <Badge variant="outline">{conversation.source}</Badge>
             <span>Created {formatDate(conversation.created_at)}</span>
@@ -312,13 +327,17 @@ export function ConversationThread({ conversationId }: { conversationId: string 
                 {formatRole(message.role)}
                 {highlightId === message.id ? " · Matched" : ""}
               </p>
-              <p className="text-[11px] text-muted-foreground">
-                {formatImportedAt(message.created_at)}
-              </p>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <CopyTextButton text={message.content} />
+                <p className="text-[11px] text-muted-foreground">
+                  {formatImportedAt(message.created_at)}
+                </p>
+              </div>
             </div>
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-6">
-              {message.content || "(no text)"}
-            </pre>
+            <ExpandableMessage
+              content={message.content}
+              defaultExpanded={highlightId === message.id}
+            />
           </article>
         ))}
 

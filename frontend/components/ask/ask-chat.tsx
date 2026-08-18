@@ -2,25 +2,33 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { X } from "lucide-react"
 
 import { AskMentionPicker } from "@/components/ask/ask-mention-picker"
+import { AskSessionSidebar } from "@/components/ask/ask-session-sidebar"
+import { AskSources } from "@/components/ask/ask-sources"
+import { DateRangeChips, rangeToIso, type MemoryRangeKey } from "@/components/memory/date-range-chips"
 import { EmptyState } from "@/components/layout/empty-state"
+import { MessageMarkdown } from "@/components/markdown/message-markdown"
 import { Button } from "@/components/ui/button"
+import { CopyTextButton } from "@/components/ui/copy-text-button"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  askJistory,
+  askJistoryStream,
   conversationTitle,
-  formatDate,
+  deleteAskSession,
+  getAskSession,
   getDashboard,
   getSettings,
+  listAskSessions,
 } from "@/lib/api"
 import {
   getActiveMention,
   MAX_TAGGED_CONVERSATIONS,
   removeActiveMention,
 } from "@/lib/mentions"
-import type { ConversationSummary, SourceReference } from "@/types/api"
+import type { AskSessionSummary, ConversationSummary, SourceReference } from "@/types/api"
 import { cn } from "@/lib/utils"
 
 type ChatItem = {
@@ -30,19 +38,10 @@ type ChatItem = {
   tags?: ConversationSummary[]
 }
 
-const PENDING_STEPS = [
-  "Searching your history…",
-  "Reading matching messages…",
-  "Writing an answer…",
-]
-
-const PENDING_TAGGED_STEPS = [
-  "Searching tagged chats…",
-  "Reading matching messages…",
-  "Writing an answer…",
-]
-
 export function AskChat() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const sessionParam = searchParams.get("session")
   const [input, setInput] = useState("")
   const [caret, setCaret] = useState(0)
   const [items, setItems] = useState<ChatItem[]>([])
@@ -50,12 +49,17 @@ export function AskChat() {
   const [mentionItems, setMentionItems] = useState<ConversationSummary[]>([])
   const [mentionIndex, setMentionIndex] = useState(0)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [sessions, setSessions] = useState<AskSessionSummary[]>([])
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasMemories, setHasMemories] = useState<boolean | null>(null)
   const [apiKeyConfigured, setApiKeyConfigured] = useState<boolean | null>(null)
+  const [dateRange, setDateRange] = useState<MemoryRangeKey>("")
+  const [customFrom, setCustomFrom] = useState("")
+  const [customTo, setCustomTo] = useState("")
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const hadSessionParam = useRef(false)
 
   const mention = useMemo(() => getActiveMention(input, caret), [input, caret])
   const atMaxTags = tags.length >= MAX_TAGGED_CONVERSATIONS
@@ -75,7 +79,62 @@ export function AskChat() {
     void getSettings()
       .then((data) => setApiKeyConfigured(data.api_key_configured))
       .catch(() => setApiKeyConfigured(null))
+    void listAskSessions()
+      .then((data) => setSessions(data.items))
+      .catch(() => setSessions([]))
   }, [])
+
+  const resetComposer = useCallback(() => {
+    setItems([])
+    setTags([])
+    setSessionId(null)
+    setError(null)
+    setInput("")
+    setCaret(0)
+  }, [])
+
+  useEffect(() => {
+    if (!sessionParam) {
+      if (hadSessionParam.current) {
+        resetComposer()
+        hadSessionParam.current = false
+      }
+      return
+    }
+    hadSessionParam.current = true
+    let cancelled = false
+    void getAskSession(sessionParam)
+      .then((detail) => {
+        if (cancelled) return
+        const nextItems: ChatItem[] = []
+        for (const turn of detail.turns) {
+          if (turn.role === "user") {
+            nextItems.push({
+              role: "user",
+              content: turn.content,
+              tags: detail.tagged_conversations,
+            })
+          } else if (turn.role === "assistant") {
+            nextItems.push({
+              role: "assistant",
+              content: turn.content,
+              sources: turn.sources,
+            })
+          }
+        }
+        setItems(nextItems)
+        setTags(detail.tagged_conversations)
+        setSessionId(detail.id)
+        setError(null)
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        setError(err instanceof Error ? err.message : "Could not load that Ask session.")
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [sessionParam])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" })
@@ -125,23 +184,57 @@ export function AskChat() {
     setInput("")
     setCaret(0)
     setError(null)
-    setItems((current) => [...current, { role: "user", content: message, tags: tagged }])
+    setItems((current) => [
+      ...current,
+      { role: "user", content: message, tags: tagged },
+      { role: "assistant", content: "", sources: [] },
+    ])
     setPending(true)
     try {
-      const response = await askJistory(
+      await askJistoryStream(
         message,
         sessionId,
-        tagged.map((tag) => tag.id)
-      )
-      setSessionId(response.conversation_id)
-      setItems((current) => [
-        ...current,
+        tagged.map((tag) => tag.id),
+        rangeToIso(dateRange, customFrom, customTo),
         {
-          role: "assistant",
-          content: response.answer,
-          sources: response.sources,
-        },
-      ])
+          onSources: (payload) => {
+            if (payload.conversation_id) setSessionId(payload.conversation_id)
+            setItems((current) => {
+              const next = [...current]
+              const last = next[next.length - 1]
+              if (last?.role === "assistant") {
+                next[next.length - 1] = { ...last, sources: payload.sources }
+              }
+              return next
+            })
+          },
+          onToken: (text) => {
+            setItems((current) => {
+              const next = [...current]
+              const last = next[next.length - 1]
+              if (last?.role === "assistant") {
+                next[next.length - 1] = { ...last, content: `${last.content}${text}` }
+              }
+              return next
+            })
+          },
+          onDone: (payload) => {
+            setSessionId(payload.conversation_id)
+            setItems((current) => {
+              const next = [...current]
+              const last = next[next.length - 1]
+              if (last?.role === "assistant" && payload.answer && !last.content) {
+                next[next.length - 1] = { ...last, content: payload.answer }
+              }
+              return next
+            })
+            router.replace(`/ask?session=${encodeURIComponent(payload.conversation_id)}`)
+            void listAskSessions()
+              .then((data) => setSessions(data.items))
+              .catch(() => undefined)
+          },
+        }
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ask failed.")
     } finally {
@@ -222,6 +315,31 @@ export function AskChat() {
       : `Type @ to tag up to ${MAX_TAGGED_CONVERSATIONS} chats. Tags stay after send so follow-ups stay scoped.`
 
   return (
+    <div className="flex h-full min-h-0 flex-1 max-md:flex-col">
+      <AskSessionSidebar
+        sessions={sessions}
+        activeId={sessionParam || sessionId}
+        onNew={() => {
+          resetComposer()
+          router.push("/ask")
+        }}
+        onSelect={(id) => {
+          router.push(`/ask?session=${encodeURIComponent(id)}`)
+        }}
+        onDelete={(id) => {
+          void deleteAskSession(id)
+            .then(() => {
+              setSessions((current) => current.filter((session) => session.id !== id))
+              if ((sessionParam || sessionId) === id) {
+                resetComposer()
+                router.push("/ask")
+              }
+            })
+            .catch((err: unknown) => {
+              setError(err instanceof Error ? err.message : "Could not delete that session.")
+            })
+        }}
+      />
     <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-1 flex-col px-6 py-6">
       <div className="mb-6">
         <h2 className="text-lg font-medium tracking-tight">Ask Jistory</h2>
@@ -266,9 +384,14 @@ export function AskChat() {
               item.role === "user" ? "bg-muted/40" : "bg-card"
             )}
           >
-            <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              {item.role === "user" ? "You" : "Jistory"}
-            </p>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                {item.role === "user" ? "You" : "Jistory"}
+              </p>
+              {item.role === "assistant" && item.content ? (
+                <CopyTextButton text={item.content} className="-mr-1.5" />
+              ) : null}
+            </div>
             {item.tags && item.tags.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-1.5">
                 {item.tags.map((tag) => (
@@ -283,41 +406,22 @@ export function AskChat() {
                 ))}
               </div>
             )}
-            <p className="whitespace-pre-wrap text-sm leading-6">{item.content}</p>
-            {item.sources && item.sources.length > 0 && (
-              <div className="mt-4 border-t border-border pt-3">
-                <p className="mb-2 text-xs font-medium text-muted-foreground">Sources</p>
-                <ol className="flex flex-col gap-2">
-                  {item.sources.map((source, sourceIndex) => (
-                    <li key={`${source.conversation_id}-${sourceIndex}`}>
-                      <Link
-                        href={
-                          source.message_id
-                            ? `/conversations/${source.conversation_id}?message=${source.message_id}`
-                            : `/conversations/${source.conversation_id}`
-                        }
-                        className="block rounded-lg px-2 py-1.5 hover:bg-muted"
-                      >
-                        <p className="text-sm">
-                          {sourceIndex + 1}. {conversationTitle(source.title)}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {source.source} · {formatDate(source.timestamp)}
-                        </p>
-                        {source.snippet && (
-                          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                            {source.snippet}
-                          </p>
-                        )}
-                      </Link>
-                    </li>
-                  ))}
-                </ol>
-              </div>
+            {item.role === "assistant" ? (
+              item.content ? (
+                <MessageMarkdown content={item.content} />
+              ) : pending && index === items.length - 1 ? (
+                <p className="whitespace-pre-wrap text-sm leading-6">
+                  Searching your history…
+                </p>
+              ) : null
+            ) : (
+              <p className="whitespace-pre-wrap text-sm leading-6">{item.content}</p>
             )}
+            {item.sources && item.sources.length > 0 ? (
+              <AskSources sources={item.sources} />
+            ) : null}
           </div>
         ))}
-        {pending && <AskPendingBubble tagged={tags.length > 0} />}
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div ref={bottomRef} />
       </div>
@@ -342,6 +446,16 @@ export function AskChat() {
               />
             )}
             <div className="rounded-lg border border-border bg-background focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+              <div className="px-3 pt-2">
+                <DateRangeChips
+                  range={dateRange}
+                  customFrom={customFrom}
+                  customTo={customTo}
+                  onRangeChange={setDateRange}
+                  onCustomFromChange={setCustomFrom}
+                  onCustomToChange={setCustomTo}
+                />
+              </div>
               {tags.length > 0 && (
                 <div className="flex flex-wrap items-start gap-1.5 px-3 pt-2">
                   {tags.map((tag) => (
@@ -395,33 +509,6 @@ export function AskChat() {
         </>
       )}
     </div>
-  )
-}
-
-function AskPendingBubble({ tagged }: { tagged: boolean }) {
-  const steps = tagged ? PENDING_TAGGED_STEPS : PENDING_STEPS
-  const [step, setStep] = useState(0)
-
-  useEffect(() => {
-    const handle = window.setInterval(() => {
-      setStep((current) => (current + 1) % steps.length)
-    }, 1600)
-    return () => window.clearInterval(handle)
-  }, [tagged, steps.length])
-
-  return (
-    <div className="rounded-xl border border-border bg-card px-4 py-3" aria-live="polite">
-      <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        Jistory
-      </p>
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <span className="flex gap-1" aria-hidden>
-          <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/80" />
-          <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/80 [animation-delay:160ms]" />
-          <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/80 [animation-delay:320ms]" />
-        </span>
-        {steps[step]}
-      </div>
     </div>
   )
 }

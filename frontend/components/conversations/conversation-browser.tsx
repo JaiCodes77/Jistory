@@ -3,11 +3,12 @@
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 
+import { ForgetButton } from "@/components/conversations/forget-button"
 import { EmptyState } from "@/components/layout/empty-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { conversationTitle, formatDate, listConversations } from "@/lib/api"
+import { conversationTitle, forgetConversation, formatDate, listConversationSources, listConversations } from "@/lib/api"
 import type { ConversationSummary } from "@/types/api"
 
 const RANGES = [
@@ -35,6 +36,7 @@ export function ConversationBrowser() {
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
   const [source, setSource] = useState("")
+  const [sourceOptions, setSourceOptions] = useState<string[]>(["ChatGPT", "Claude"])
   const [range, setRange] = useState("all")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
@@ -46,6 +48,12 @@ export function ConversationBrowser() {
     const handle = window.setTimeout(() => setDebouncedSearch(search), 200)
     return () => window.clearTimeout(handle)
   }, [search])
+
+  useEffect(() => {
+    void listConversationSources()
+      .then((data) => setSourceOptions(data.items))
+      .catch(() => undefined)
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -111,10 +119,11 @@ export function ConversationBrowser() {
             className="h-8 rounded-lg border border-border bg-background px-2 text-sm"
           >
             <option value="">All sources</option>
-            <option value="ChatGPT">ChatGPT</option>
-            <option value="Claude">Claude</option>
-            <option value="Gemini">Gemini</option>
-            <option value="Cursor">Cursor</option>
+            {sourceOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
           </select>
           <select
             value={range}
@@ -177,24 +186,37 @@ export function ConversationBrowser() {
       {!loading && items.length > 0 && (
         <div className="flex flex-col gap-2">
           {items.map((item) => (
-            <Link
+            <div
               key={item.id}
-              href={`/conversations/${item.id}`}
-              className="rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/40"
+              className="flex items-stretch overflow-hidden rounded-xl border border-border bg-card"
             >
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {conversationTitle(item.title)}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {formatDate(item.updated_at || item.created_at)} ·{" "}
-                    {item.message_count.toLocaleString()} messages
-                  </p>
+              <Link
+                href={`/conversations/${item.id}`}
+                className="min-w-0 flex-1 px-4 py-3 transition-colors hover:bg-muted/40"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {conversationTitle(item.title)}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatDate(item.updated_at || item.created_at)} ·{" "}
+                      {item.message_count.toLocaleString()} messages
+                    </p>
+                  </div>
+                  <Badge variant="outline">{item.source}</Badge>
                 </div>
-                <Badge variant="outline">{item.source}</Badge>
+              </Link>
+              <div className="flex items-center border-l border-border px-2">
+                <ForgetButton
+                  confirmCopy="This permanently deletes this conversation, its messages, and embeddings. Search and Ask will no longer use it."
+                  onConfirm={async () => {
+                    await forgetConversation(item.id)
+                    await load()
+                  }}
+                />
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}

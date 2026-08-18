@@ -17,6 +17,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("GEMINI_API_KEY", "")
     monkeypatch.setenv("MAX_IMPORT_SIZE_MB", "5")
     monkeypatch.setenv("IMPORTS_DIR", str(tmp_path / "imports"))
+    monkeypatch.setenv("CURSOR_IMPORT_PATH", "")
     get_settings.cache_clear()
     reset_engine()
 

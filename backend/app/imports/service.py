@@ -6,10 +6,13 @@ from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.config import DATA_DIR, Settings
+from app.core.errors import AppError
+from app.imports.chatgpt.persistence import delete_import_conversations
 from app.imports.extractor import (
     allocate_import_directory,
     cleanup_directory,
     extract_zip,
+    resolve_import_directory,
 )
 from app.imports.validators import (
     ImportValidationError,
@@ -21,8 +24,8 @@ from app.imports.validators import (
     validate_filename,
     zip_member_names,
 )
-from app.models.import_job import ImportJob, ImportSource, ImportStatus
-from app.schemas.import_job import ImportJobResponse
+from app.models.import_job import PARSEABLE_STATUSES, ImportJob, ImportSource, ImportStatus
+from app.schemas.import_job import ImportDeleteResponse, ImportJobResponse
 
 
 class ImportService:
@@ -134,6 +137,54 @@ class ImportService:
                 "Import failed due to an unexpected server error.",
                 code="import_failed",
             ) from exc
+
+    def forget_import_job(self, import_id: str) -> ImportDeleteResponse:
+        job = self.db.get(ImportJob, import_id)
+        if job is None:
+            raise AppError("Import job was not found.", code="import_not_found", status_code=404)
+
+        folder = resolve_import_directory(
+            job.folder_path,
+            imports_root=self.imports_root,
+            data_root=DATA_DIR,
+        )
+        deleted = delete_import_conversations(self.db, job.id)
+        self.db.delete(job)
+        self.db.commit()
+        if folder is not None:
+            cleanup_directory(folder)
+        return ImportDeleteResponse(
+            success=True,
+            importId=import_id,
+            conversations_deleted=deleted,
+        )
+
+    def reindex_import_job(self, import_id: str) -> ImportJob:
+        job = self.db.get(ImportJob, import_id)
+        if job is None:
+            raise AppError("Import job was not found.", code="import_not_found", status_code=404)
+        if job.status == ImportStatus.FAILED.value or job.status not in PARSEABLE_STATUSES:
+            raise AppError(
+                "This import cannot be reindexed in its current state.",
+                code="invalid_status",
+                status_code=400,
+            )
+        if (job.conversations_imported or 0) <= 0 and job.status == ImportStatus.UPLOADED.value:
+            raise AppError(
+                "Parse this import before reindexing embeddings.",
+                code="not_parsed",
+                status_code=400,
+            )
+
+        from app.embeddings.jobs import schedule_embedding_index
+
+        job.status = ImportStatus.INDEXING.value
+        job.index_error = None
+        self.db.add(job)
+        self.db.commit()
+        self.db.refresh(job)
+        schedule_embedding_index(job.id)
+        return job
 
     def _record_failed_job(
         self,

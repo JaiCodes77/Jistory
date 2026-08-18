@@ -4,6 +4,8 @@ import { useCallback, useRef, useState } from "react"
 import Link from "next/link"
 import { CheckCircle2, FileArchive, LoaderCircle, Upload } from "lucide-react"
 
+import { ForgetButton } from "@/components/conversations/forget-button"
+import { CursorImporter } from "@/components/import/cursor-importer"
 import {
   ImportError,
   ImportIndexBanner,
@@ -21,8 +23,10 @@ import {
 import {
   formatBytes,
   formatImportedAt,
+  forgetImportJob,
   getImportJob,
   parseImportJob,
+  reindexImportJob,
   uploadExport,
 } from "@/lib/api"
 import { formatImportStatus } from "@/lib/labels"
@@ -52,6 +56,8 @@ export function ImportUploader() {
   const [parseResult, setParseResult] = useState<ParseJobSuccess | null>(null)
   const [indexStatus, setIndexStatus] = useState<ImportStatusResponse | null>(null)
   const [shareStatus, setShareStatus] = useState<IndexBannerState | null>(null)
+  const [cursorStatus, setCursorStatus] = useState<IndexBannerState | null>(null)
+  const [reindexing, setReindexing] = useState(false)
 
   const resetSelection = useCallback(() => {
     setFile(null)
@@ -201,17 +207,21 @@ export function ImportUploader() {
       ? zipBanner
       : shareStatus?.indexing || shareStatus?.indexError
         ? shareStatus
-        : zipBanner?.keywordReady
-          ? zipBanner
-          : shareStatus
+        : cursorStatus?.indexing || cursorStatus?.indexError
+          ? cursorStatus
+          : zipBanner?.keywordReady
+            ? zipBanner
+            : shareStatus?.keywordReady
+              ? shareStatus
+              : cursorStatus
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
       <div className="flex flex-col gap-2">
         <h2 className="text-lg font-medium tracking-tight">Import</h2>
         <p className="text-sm text-muted-foreground">
-          Paste a ChatGPT or Claude share link, or upload an export ZIP. Both
-          land in the same local library.
+          Paste a ChatGPT or Claude share link, upload an export ZIP, or import
+          Cursor chats from a file you choose. Everything stays on this machine.
         </p>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
           <span>1. Upload or paste</span>
@@ -221,7 +231,32 @@ export function ImportUploader() {
         </div>
       </div>
 
-      {pageBanner && <ImportIndexBanner state={pageBanner} />}
+      {pageBanner && (
+        <ImportIndexBanner
+          state={pageBanner}
+          reindexing={reindexing}
+          onReindex={
+            result?.importId && pageBanner.indexError
+              ? () => {
+                  void (async () => {
+                    if (!result?.importId) return
+                    setReindexing(true)
+                    try {
+                      await reindexImportJob(result.importId)
+                      await pollIndex(result.importId)
+                    } catch (err) {
+                      setParseError(
+                        err instanceof Error ? err.message : "Could not reindex embeddings."
+                      )
+                    } finally {
+                      setReindexing(false)
+                    }
+                  })()
+                }
+              : undefined
+          }
+        />
+      )}
 
       <div className="grid items-stretch gap-4 lg:grid-cols-2">
         <ShareLinkImporter onStatusChange={setShareStatus} />
@@ -391,6 +426,8 @@ export function ImportUploader() {
         </Card>
       </div>
 
+      <CursorImporter onStatusChange={setCursorStatus} />
+
       {result && state === "success" && (
         <Card className="border-border bg-card shadow-none">
           <CardHeader className="pb-3">
@@ -414,6 +451,14 @@ export function ImportUploader() {
               <SummaryItem label="Source" value={result.source} />
               <SummaryItem label="Import ID" value={result.importId} mono />
             </dl>
+            <ForgetButton
+              label="Forget this import"
+              confirmCopy="This permanently deletes this import and every conversation, message, and embedding that came from it."
+              onConfirm={async () => {
+                await forgetImportJob(result.importId)
+                resetSelection()
+              }}
+            />
           </CardContent>
         </Card>
       )}

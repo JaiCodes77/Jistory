@@ -56,6 +56,7 @@ class UserSettingsPublic(BaseModel):
     sent_to_gemini_on_ask: bool = True
     embedding_status: str = "idle"
     embedding_status_detail: str = ""
+    cursor_import_path: str = ""
 
 
 class UserSettingsUpdate(BaseModel):
@@ -63,3 +64,4 @@ class UserSettingsUpdate(BaseModel):
     gemini_api_key: str | None = Field(default=None, max_length=512)
     retrieval_limit: int | None = Field(default=None, ge=1, le=32)
     embedding_provider: str | None = None
+    cursor_import_path: str | None = Field(default=None, max_length=2048)

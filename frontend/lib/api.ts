@@ -1,11 +1,13 @@
 import type {
-  AskResponse,
+  AskSessionDetail,
+  AskSessionSummary,
   ConversationFilters,
   ConversationListResponse,
   ConversationSummary,
   DashboardResponse,
   MessageListResponse,
   SearchResponse,
+  SourceReference,
   UserSettings,
 } from "@/types/api"
 import type {
@@ -192,8 +194,32 @@ export async function importShareLink(url: string): Promise<ParseJobSuccess> {
   })
 }
 
+export async function importCursorFromPath(path?: string): Promise<ParseJobSuccess> {
+  return apiFetch<ParseJobSuccess>("/import/cursor", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: path?.trim() ? path.trim() : null }),
+  })
+}
+
+export async function importCursorFile(file: File): Promise<ParseJobSuccess> {
+  const formData = new FormData()
+  formData.append("file", file)
+  return apiFetch<ParseJobSuccess>("/import/cursor/upload", {
+    method: "POST",
+    body: formData,
+  })
+}
+
 export async function getImportJob(importId: string): Promise<ImportStatusResponse> {
   return apiFetch<ImportStatusResponse>(`/import/${importId}`)
+}
+
+export async function listConversationSources(): Promise<{
+  items: string[]
+  available: string[]
+}> {
+  return apiFetch<{ items: string[]; available: string[] }>("/conversations/sources")
 }
 
 export async function listConversations(
@@ -215,6 +241,20 @@ export async function getConversation(
   id: string
 ): Promise<ConversationSummary> {
   return apiFetch<ConversationSummary>(`/conversations/${id}`)
+}
+
+export async function forgetConversation(id: string): Promise<void> {
+  await apiFetch(`/conversations/${id}`, { method: "DELETE" })
+}
+
+export async function forgetImportJob(importId: string): Promise<void> {
+  await apiFetch(`/import/${importId}`, { method: "DELETE" })
+}
+
+export async function reindexImportJob(importId: string): Promise<ImportStatusResponse> {
+  return apiFetch<ImportStatusResponse>(`/import/${importId}/reindex`, {
+    method: "POST",
+  })
 }
 
 export async function getConversationMessages(
@@ -240,7 +280,12 @@ export async function getConversationMessages(
 export async function searchMemories(
   query: string,
   page = 1,
-  pageSize = 20
+  pageSize = 20,
+  options?: {
+    source?: string
+    dateFrom?: string
+    dateTo?: string
+  }
 ): Promise<SearchResponse> {
   const params = new URLSearchParams({
     q: query,
@@ -248,23 +293,124 @@ export async function searchMemories(
     page_size: String(pageSize),
     mode: "hybrid",
   })
+  if (options?.source) params.set("source", options.source)
+  if (options?.dateFrom) params.set("date_from", options.dateFrom)
+  if (options?.dateTo) params.set("date_to", options.dateTo)
   return apiFetch<SearchResponse>(`/search?${params.toString()}`)
 }
 
-export async function askJistory(
+export async function askJistoryStream(
   message: string,
-  conversationId?: string | null,
-  taggedConversationIds?: string[]
-): Promise<AskResponse> {
-  return apiFetch<AskResponse>("/ask", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      message,
-      conversation_id: conversationId || null,
-      tagged_conversation_ids: taggedConversationIds ?? [],
-    }),
-  })
+  conversationId: string | null | undefined,
+  taggedConversationIds: string[] | undefined,
+  dateRange: { dateFrom?: string; dateTo?: string } | undefined,
+  handlers: {
+    onSources: (payload: {
+      sources: SourceReference[]
+      retrieved: number
+      conversation_id: string
+    }) => void
+    onToken: (text: string) => void
+    onDone: (payload: {
+      conversation_id: string
+      retrieved: number
+      answer: string
+    }) => void
+  }
+): Promise<void> {
+  let response: Response
+  try {
+    response = await fetch(getApiUrl("/ask/stream"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message,
+        conversation_id: conversationId || null,
+        tagged_conversation_ids: taggedConversationIds ?? [],
+        date_from: dateRange?.dateFrom || null,
+        date_to: dateRange?.dateTo || null,
+      }),
+    })
+  } catch {
+    throw new Error(
+      "Server unavailable. Check that the backend is running on port 8000."
+    )
+  }
+
+  if (!response.ok) {
+    let payload: unknown
+    try {
+      payload = await response.json()
+    } catch {
+      throw new Error("Received an invalid response from the server.")
+    }
+    const errorPayload = payload as ImportJobError
+    throw new Error(
+      errorPayload?.error ||
+        mapStatusToMessage(response.status) ||
+        "Request failed."
+    )
+  }
+
+  if (!response.body) {
+    throw new Error("Received an invalid response from the server.")
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ""
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const parts = buffer.split("\n\n")
+    buffer = parts.pop() ?? ""
+    for (const part of parts) {
+      const line = part
+        .split("\n")
+        .find((item) => item.startsWith("data: "))
+      if (!line) continue
+      const event = JSON.parse(line.slice(6)) as {
+        type: string
+        text?: string
+        sources?: SourceReference[]
+        retrieved?: number
+        conversation_id?: string
+        answer?: string
+        error?: string
+        code?: string
+      }
+      if (event.type === "sources") {
+        handlers.onSources({
+          sources: event.sources ?? [],
+          retrieved: event.retrieved ?? 0,
+          conversation_id: event.conversation_id || "",
+        })
+      } else if (event.type === "token" && event.text) {
+        handlers.onToken(event.text)
+      } else if (event.type === "done") {
+        handlers.onDone({
+          conversation_id: event.conversation_id || "",
+          retrieved: event.retrieved ?? 0,
+          answer: event.answer || "",
+        })
+      } else if (event.type === "error") {
+        throw new Error(event.error || mapStatusToMessage(400) || "Ask failed.")
+      }
+    }
+  }
+}
+
+export async function listAskSessions(): Promise<{ items: AskSessionSummary[] }> {
+  return apiFetch<{ items: AskSessionSummary[] }>("/ask/sessions")
+}
+
+export async function getAskSession(id: string): Promise<AskSessionDetail> {
+  return apiFetch<AskSessionDetail>(`/ask/sessions/${id}`)
+}
+
+export async function deleteAskSession(id: string): Promise<void> {
+  await apiFetch(`/ask/sessions/${id}`, { method: "DELETE" })
 }
 
 export async function getDashboard(): Promise<DashboardResponse> {
@@ -281,6 +427,7 @@ export async function updateSettings(
     gemini_api_key: string
     retrieval_limit: number
     embedding_provider: string
+    cursor_import_path: string
   }>
 ): Promise<UserSettings> {
   return apiFetch<UserSettings>("/settings", {

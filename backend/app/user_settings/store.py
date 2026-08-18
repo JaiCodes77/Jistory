@@ -46,6 +46,9 @@ def save_overrides(updates: dict, settings: Settings | None = None) -> dict:
         if key == "gemini_api_key" and str(value).strip() == "":
             current.pop("gemini_api_key", None)
             continue
+        if key == "cursor_import_path" and str(value).strip() == "":
+            current.pop("cursor_import_path", None)
+            continue
         current[key] = value
     path.write_text(json.dumps(current, indent=2), encoding="utf-8")
     return current
@@ -67,6 +70,8 @@ def resolve_settings(settings: Settings) -> Settings:
     provider = str(data.get("embedding_provider") or "").strip().lower()
     if provider in ALLOWED_EMBEDDING_PROVIDERS:
         updates["embedding_provider"] = provider
+    if data.get("cursor_import_path") is not None:
+        updates["cursor_import_path"] = str(data.get("cursor_import_path") or "").strip()
     if not updates:
         return settings
     return settings.model_copy(update=updates)
@@ -86,4 +91,5 @@ def public_settings(settings: Settings) -> dict:
         "sent_to_gemini_on_ask": True,
         "embedding_status": embedding["status"],
         "embedding_status_detail": embedding["detail"],
+        "cursor_import_path": resolved.cursor_import_path or "",
     }

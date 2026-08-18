@@ -4,10 +4,11 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
+import { DateRangeChips, rangeToIso, type MemoryRangeKey } from "@/components/memory/date-range-chips"
 import { EmptyState } from "@/components/layout/empty-state"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { conversationTitle, formatDate, getDashboard, searchMemories } from "@/lib/api"
+import { conversationTitle, formatDate, getDashboard, listConversationSources, searchMemories } from "@/lib/api"
 import type { SearchHit } from "@/types/api"
 
 const PAGE_SIZE = 20
@@ -23,11 +24,19 @@ export function SearchResults() {
   const [results, setResults] = useState<SearchHit[]>([])
   const [total, setTotal] = useState(0)
   const [hasMemories, setHasMemories] = useState<boolean | null>(null)
+  const [source, setSource] = useState("")
+  const [sourceOptions, setSourceOptions] = useState<string[]>(["ChatGPT", "Claude"])
+  const [dateRange, setDateRange] = useState<MemoryRangeKey>("")
+  const [customFrom, setCustomFrom] = useState("")
+  const [customTo, setCustomTo] = useState("")
 
   useEffect(() => {
     void getDashboard()
       .then((data) => setHasMemories(data.total_conversations > 0))
       .catch(() => setHasMemories(null))
+    void listConversationSources()
+      .then((data) => setSourceOptions(data.items))
+      .catch(() => undefined)
   }, [])
 
   useEffect(() => {
@@ -51,7 +60,12 @@ export function SearchResults() {
       setLoading(true)
       setError(null)
       try {
-        const response = await searchMemories(trimmed, page, PAGE_SIZE)
+        const dates = rangeToIso(dateRange, customFrom, customTo)
+        const response = await searchMemories(trimmed, page, PAGE_SIZE, {
+          source,
+          dateFrom: dates.dateFrom,
+          dateTo: dates.dateTo,
+        })
         setResults(response.results)
         setTotal(response.total)
       } catch (err) {
@@ -61,7 +75,7 @@ export function SearchResults() {
       }
     }, 80)
     return () => window.clearTimeout(handle)
-  }, [queryParam, page])
+  }, [queryParam, page, source, dateRange, customFrom, customTo])
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -97,6 +111,44 @@ export function SearchResults() {
           />
           <Button type="submit">Search</Button>
         </form>
+      )}
+
+      {hasMemories !== false && (
+        <div className="flex flex-col gap-3">
+          <DateRangeChips
+            range={dateRange}
+            customFrom={customFrom}
+            customTo={customTo}
+            onRangeChange={(value) => {
+              setDateRange(value)
+              setPage(1)
+            }}
+            onCustomFromChange={(value) => {
+              setCustomFrom(value)
+              setPage(1)
+            }}
+            onCustomToChange={(value) => {
+              setCustomTo(value)
+              setPage(1)
+            }}
+          />
+          <select
+            value={source}
+            onChange={(event) => {
+              setSource(event.target.value)
+              setPage(1)
+            }}
+            className="h-8 w-full max-w-xs rounded-lg border border-border bg-background px-2 text-sm"
+            aria-label="Filter by source"
+          >
+            <option value="">All sources</option>
+            {sourceOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
 
       {loading && (

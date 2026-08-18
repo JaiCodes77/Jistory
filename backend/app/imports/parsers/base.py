@@ -1,7 +1,7 @@
 """Parser interfaces for conversation export formats.
 
-Future parsers (Gemini, Cursor) should implement ConversationParser
-without changing persistence or API layers.
+New source parsers should implement ConversationParser and emit
+ParsedConversation rows without changing persistence or API layers.
 """
 
 from __future__ import annotations

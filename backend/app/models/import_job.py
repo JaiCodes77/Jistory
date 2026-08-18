@@ -11,6 +11,7 @@ from app.db.base import Base
 class ImportSource(str, enum.Enum):
     CHATGPT = "ChatGPT"
     CLAUDE = "Claude"
+    CURSOR = "Cursor"
 
 
 class ImportStatus(str, enum.Enum):

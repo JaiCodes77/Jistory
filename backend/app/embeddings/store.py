@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import array
+import heapq
 import json
 import logging
 import math
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -85,11 +88,71 @@ def replace_chunks(
     return stored
 
 
-def load_embedded_chunks(
+@dataclass(frozen=True)
+class ScoredChunk:
+    score: float
+    conversation_id: str
+    source: str
+    timestamp: datetime | None
+    text: str
+    message_ids: str
+
+
+def top_similar_chunks(
     db: Session,
+    query_vec: list[float],
+    *,
+    limit: int,
     conversation_ids: Sequence[str] | None = None,
-) -> list[MemoryChunk]:
-    stmt = select(MemoryChunk).where(MemoryChunk.embedding.is_not(None))
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    source: str | None = None,
+) -> list[ScoredChunk]:
+    """Score embeddings in a bounded heap so the full vector table is not held in RAM."""
+    if limit <= 0 or not query_vec:
+        return []
+
+    stmt = (
+        select(
+            MemoryChunk.conversation_id,
+            MemoryChunk.source,
+            MemoryChunk.timestamp,
+            MemoryChunk.text,
+            MemoryChunk.message_ids,
+            MemoryChunk.embedding,
+        )
+        .where(MemoryChunk.embedding.is_not(None))
+        .execution_options(yield_per=64)
+    )
     if conversation_ids:
         stmt = stmt.where(MemoryChunk.conversation_id.in_(list(conversation_ids)))
-    return list(db.scalars(stmt).all())
+    if date_from is not None:
+        stmt = stmt.where(MemoryChunk.timestamp >= date_from)
+    if date_to is not None:
+        stmt = stmt.where(MemoryChunk.timestamp <= date_to)
+    if source and source.strip():
+        stmt = stmt.where(MemoryChunk.source == source.strip())
+
+    heap: list[tuple[float, int, ScoredChunk]] = []
+    seq = 0
+    for row in db.execute(stmt):
+        blob = row.embedding
+        if not blob:
+            continue
+        score = cosine(query_vec, unpack_embedding(blob))
+        seq += 1
+        item = ScoredChunk(
+            score=score,
+            conversation_id=row.conversation_id,
+            source=row.source,
+            timestamp=row.timestamp,
+            text=row.text,
+            message_ids=row.message_ids,
+        )
+        if len(heap) < limit:
+            heapq.heappush(heap, (score, seq, item))
+        elif score > heap[0][0]:
+            heapq.heapreplace(heap, (score, seq, item))
+
+    ranked = sorted(heap, key=lambda entry: entry[0], reverse=True)
+    return [entry[2] for entry in ranked]

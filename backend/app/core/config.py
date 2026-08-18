@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Jistory"
-    app_version: str = "1.1.0"
+    app_version: str = "1.2.0"
     debug: bool = True
     api_prefix: str = "/api"
 
@@ -39,6 +39,7 @@ class Settings(BaseSettings):
 
     retrieval_limit: int = 8
     ask_max_history_turns: int = 8
+    cursor_import_path: str = ""
 
     @property
     def cors_origins_list(self) -> list[str]:

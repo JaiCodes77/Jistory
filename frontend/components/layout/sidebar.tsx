@@ -8,11 +8,23 @@ import { Separator } from "@/components/ui/separator"
 import { mainNav } from "@/lib/navigation"
 import { cn } from "@/lib/utils"
 
-export function Sidebar() {
+type SidebarProps = {
+  mobileOpen?: boolean
+  onNavigate?: () => void
+}
+
+export function Sidebar({ mobileOpen = false, onNavigate }: SidebarProps) {
   const pathname = usePathname()
 
   return (
-    <aside className="flex h-full w-56 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground">
+    <aside
+      id="jistory-sidebar"
+      className={cn(
+        "flex h-full w-56 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground",
+        "max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50",
+        !mobileOpen && "max-md:hidden"
+      )}
+    >
       <div className="flex h-12 items-center gap-2 px-4">
         <div className="flex size-6 items-center justify-center rounded-md bg-foreground text-[11px] font-semibold text-background">
           J
@@ -35,6 +47,7 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onNavigate}
                 className={cn(
                   "flex h-8 items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
                   isActive

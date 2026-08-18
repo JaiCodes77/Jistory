@@ -15,6 +15,7 @@ export function SettingsForm() {
   const [model, setModel] = useState("")
   const [apiKey, setApiKey] = useState("")
   const [retrievalLimit, setRetrievalLimit] = useState("8")
+  const [cursorPath, setCursorPath] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -26,6 +27,7 @@ export function SettingsForm() {
         setSettings(data)
         setModel(data.gemini_model)
         setRetrievalLimit(String(data.retrieval_limit))
+        setCursorPath(data.cursor_import_path || "")
       })
       .catch((err: unknown) =>
         setError(err instanceof Error ? err.message : "Could not load settings.")
@@ -51,6 +53,7 @@ export function SettingsForm() {
       const payload: Parameters<typeof updateSettings>[0] = {
         gemini_model: model.trim(),
         retrieval_limit: Number(retrievalLimit) || 8,
+        cursor_import_path: cursorPath.trim(),
       }
       if (apiKey.trim()) payload.gemini_api_key = apiKey.trim()
       const next = await updateSettings(payload)
@@ -152,6 +155,27 @@ export function SettingsForm() {
               : ""}
           </p>
         )}
+      </section>
+
+      <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
+        <div>
+          <h3 className="text-sm font-medium">Cursor import</h3>
+          <p className="text-xs text-muted-foreground">
+            Optional default path to <span className="font-mono">state.vscdb</span> or a
+            folder of transcripts. Jistory never scans $HOME or ~/Library on its own.
+          </p>
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="cursor-path">Local path</Label>
+          <Input
+            id="cursor-path"
+            value={cursorPath}
+            onChange={(event) => setCursorPath(event.target.value)}
+            placeholder="/absolute/path/to/state.vscdb"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
       </section>
 
       <section className="rounded-xl border border-border bg-card p-4 text-sm">

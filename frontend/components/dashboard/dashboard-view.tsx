@@ -3,10 +3,12 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 
+import { ForgetButton } from "@/components/conversations/forget-button"
 import { EmptyState } from "@/components/layout/empty-state"
 import { Badge } from "@/components/ui/badge"
 import {
   conversationTitle,
+  forgetImportJob,
   formatDate,
   formatDayLabel,
   formatImportedAt,
@@ -94,6 +96,17 @@ export function DashboardView() {
               ? ` · ${data.latest_import.conversations.toLocaleString()} conversations`
               : ""}
           </p>
+          <div className="mt-3">
+            <ForgetButton
+              label="Forget this import"
+              confirmCopy="This permanently deletes this import and every conversation, message, and embedding that came from it."
+              onConfirm={async () => {
+                await forgetImportJob(data.latest_import!.id)
+                const next = await getDashboard()
+                setData(next)
+              }}
+            />
+          </div>
         </section>
       )}
 

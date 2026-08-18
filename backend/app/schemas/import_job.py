@@ -32,3 +32,13 @@ class ImportErrorResponse(BaseModel):
 
 class ShareImportRequest(BaseModel):
     url: str = Field(..., min_length=8, max_length=2048)
+
+
+class CursorImportRequest(BaseModel):
+    path: str | None = Field(default=None, max_length=2048)
+
+
+class ImportDeleteResponse(BaseModel):
+    success: bool = True
+    importId: str
+    conversations_deleted: int = 0

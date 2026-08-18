@@ -70,6 +70,27 @@ export type AskResponse = {
   retrieved: number
 }
 
+export type AskTurnItem = {
+  id: string
+  role: string
+  content: string
+  sources: SourceReference[]
+  created_at: string | null
+}
+
+export type AskSessionSummary = {
+  id: string
+  title: string | null
+  created_at: string
+  updated_at: string
+  tagged_conversation_ids: string[]
+}
+
+export type AskSessionDetail = AskSessionSummary & {
+  turns: AskTurnItem[]
+  tagged_conversations: ConversationSummary[]
+}
+
 export type DashboardResponse = {
   total_conversations: number
   total_messages: number
@@ -104,6 +125,7 @@ export type UserSettings = {
   sent_to_gemini_on_ask: boolean
   embedding_status: string
   embedding_status_detail: string
+  cursor_import_path: string
 }
 
 export type ConversationFilters = {

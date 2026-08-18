@@ -3,14 +3,21 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.conversations.service import get_conversation, list_conversations, list_messages
+from app.conversations.service import (
+    forget_conversation,
+    get_conversation,
+    list_conversations,
+    list_messages,
+)
 from app.core.errors import AppError
 from app.db.session import get_db
 from app.models.conversation import Conversation
+from app.models.import_job import ImportSource
 from app.schemas.conversation import (
     ConversationDetail,
     ConversationListResponse,
     ConversationSummary,
+    ForgetResponse,
     MessageItem,
     MessageListResponse,
 )
@@ -81,8 +88,25 @@ def get_conversations(
 def list_sources(db: Session = Depends(get_db)) -> dict[str, list[str]]:
     rows = db.scalars(select(Conversation.source).distinct()).all()
     present = [row for row in rows if row]
-    extras = [name for name in ("ChatGPT", "Claude", "Gemini", "Cursor") if name not in present]
+    known = [item.value for item in ImportSource]
+    extras = [name for name in known if name not in present]
     return {"items": present + extras, "available": present}
+
+
+@router.delete(
+    "/{conversation_id}",
+    response_model=ForgetResponse,
+    responses={404: {"model": ImportErrorResponse}},
+)
+def delete_conversation(
+    conversation_id: str,
+    db: Session = Depends(get_db),
+) -> ForgetResponse | JSONResponse:
+    try:
+        deleted_id = forget_conversation(db, conversation_id)
+    except AppError as exc:
+        return _error(exc)
+    return ForgetResponse(success=True, id=deleted_id, conversations_deleted=1)
 
 
 @router.get("/{conversation_id}", response_model=ConversationDetail)

@@ -89,3 +89,48 @@ def extract_zip(zip_path: Path, destination: Path) -> list[str]:
 def cleanup_directory(path: Path) -> None:
     if path.exists() and path.is_dir():
         shutil.rmtree(path, ignore_errors=True)
+
+
+def resolve_import_directory(
+    folder_path: str,
+    *,
+    imports_root: Path,
+    data_root: Path,
+) -> Path | None:
+    """Resolve a stored import folder. Returns None if the path is missing or unsafe."""
+    if folder_path in {"", "failed"}:
+        return None
+
+    imports_root = imports_root.resolve()
+    data_root = data_root.resolve()
+    raw = Path(folder_path)
+    candidates: list[Path] = []
+    if raw.is_absolute():
+        candidates.append(raw.resolve())
+    else:
+        candidates.extend(
+            [
+                (data_root / raw).resolve(),
+                (imports_root / raw).resolve(),
+                (imports_root / raw.name).resolve(),
+            ]
+        )
+
+    safe: list[Path] = []
+    for candidate in candidates:
+        try:
+            candidate.relative_to(imports_root)
+            safe.append(candidate)
+            continue
+        except ValueError:
+            pass
+        try:
+            candidate.relative_to(data_root)
+            safe.append(candidate)
+        except ValueError:
+            pass
+
+    for candidate in safe:
+        if candidate.exists() and candidate.is_dir():
+            return candidate
+    return None

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
@@ -11,10 +11,13 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.db.fts import fts_available, sanitize_fts_query, sanitize_fts_query_or
 from app.embeddings.factory import get_embedding_provider
-from app.embeddings.store import cosine, load_embedded_chunks, unpack_embedding
+from app.embeddings.store import top_similar_chunks
 from app.models.chunk import MemoryChunk
 from app.models.conversation import Conversation
 from app.models.message import Message
+
+RECENCY_HALF_LIFE_DAYS = 90.0
+HYBRID_SEARCH_CANDIDATES = 100
 
 
 @dataclass
@@ -42,26 +45,66 @@ def search_fts(
     limit: int = 20,
     offset: int = 0,
     conversation_ids: Sequence[str] | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    source: str | None = None,
 ) -> tuple[list[RetrievedChunk], int]:
     scoped = _normalize_ids(conversation_ids)
     if not fts_available(db):
-        return _like_fallback(db, query, limit=limit, offset=offset, conversation_ids=scoped)
+        return _like_fallback(
+            db,
+            query,
+            limit=limit,
+            offset=offset,
+            conversation_ids=scoped,
+            date_from=date_from,
+            date_to=date_to,
+            source=source,
+        )
 
     match = sanitize_fts_query(query)
     if not match:
         if scoped:
-            return _messages_for_conversations(db, scoped, limit=limit, offset=offset)
+            return _messages_for_conversations(
+                db,
+                scoped,
+                limit=limit,
+                offset=offset,
+                date_from=date_from,
+                date_to=date_to,
+                source=source,
+            )
         return [], 0
 
-    rows = _fts_select(db, match, limit=limit, offset=offset, conversation_ids=scoped)
+    rows = _fts_select(
+        db,
+        match,
+        limit=limit,
+        offset=offset,
+        conversation_ids=scoped,
+        date_from=date_from,
+        date_to=date_to,
+        source=source,
+    )
     active = match
     if not rows:
         match_or = sanitize_fts_query_or(query)
         if match_or and match_or != match:
-            rows = _fts_select(db, match_or, limit=limit, offset=offset, conversation_ids=scoped)
+            rows = _fts_select(
+                db,
+                match_or,
+                limit=limit,
+                offset=offset,
+                conversation_ids=scoped,
+                date_from=date_from,
+                date_to=date_to,
+                source=source,
+            )
             active = match_or
 
-    extra_sql, extra_params = _id_filter_sql(scoped)
+    extra_sql, extra_params = _hit_filter_sql(
+        scoped, date_from=date_from, date_to=date_to, source=source
+    )
     count_row = db.execute(
         text(f"SELECT COUNT(*) FROM messages_fts WHERE messages_fts MATCH :q{extra_sql}"),
         {"q": active, **extra_params},
@@ -95,8 +138,13 @@ def _fts_select(
     limit: int,
     offset: int,
     conversation_ids: Sequence[str] | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    source: str | None = None,
 ):
-    extra_sql, extra_params = _id_filter_sql(conversation_ids)
+    extra_sql, extra_params = _hit_filter_sql(
+        conversation_ids, date_from=date_from, date_to=date_to, source=source
+    )
     return db.execute(
         text(
             f"""
@@ -125,14 +173,26 @@ def _like_fallback(
     limit: int,
     offset: int,
     conversation_ids: Sequence[str] | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    source: str | None = None,
 ) -> tuple[list[RetrievedChunk], int]:
     scoped = _normalize_ids(conversation_ids)
     term = f"%{query.strip()}%"
     filters = [Message.content.ilike(term)]
     if scoped:
         filters.append(Message.conversation_id.in_(scoped))
+    filters.extend(_message_time_filters(date_from, date_to))
+    if source:
+        filters.append(Conversation.source == source)
     total = int(
-        db.scalar(select(func.count()).select_from(Message).where(*filters)) or 0
+        db.scalar(
+            select(func.count())
+            .select_from(Message)
+            .join(Conversation, Conversation.id == Message.conversation_id)
+            .where(*filters)
+        )
+        or 0
     )
     stmt = (
         select(Message, Conversation)
@@ -169,26 +229,29 @@ def search_semantic(
     *,
     limit: int = 20,
     conversation_ids: Sequence[str] | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    source: str | None = None,
 ) -> list[RetrievedChunk]:
     scoped = _normalize_ids(conversation_ids)
-    chunks = load_embedded_chunks(db, conversation_ids=scoped)
-    if not chunks:
-        return []
-
     provider = get_embedding_provider(settings)
     query_vec = provider.embed_query(query)
     if not query_vec:
         return []
 
-    scored: list[tuple[float, MemoryChunk]] = []
-    for chunk in chunks:
-        if not chunk.embedding:
-            continue
-        vec = unpack_embedding(chunk.embedding)
-        scored.append((cosine(query_vec, vec), chunk))
+    scored = top_similar_chunks(
+        db,
+        query_vec,
+        limit=max(limit, 1),
+        conversation_ids=scoped or None,
+        date_from=date_from,
+        date_to=date_to,
+        source=source,
+    )
+    if not scored:
+        return []
 
-    scored.sort(key=lambda item: item[0], reverse=True)
-    title_ids = {chunk.conversation_id for _, chunk in scored[: limit * 3]}
+    title_ids = {chunk.conversation_id for chunk in scored}
     titles = {
         row.id: row.title
         for row in db.scalars(select(Conversation).where(Conversation.id.in_(list(title_ids)))).all()
@@ -196,8 +259,8 @@ def search_semantic(
 
     hits: list[RetrievedChunk] = []
     min_score = 0.0 if scoped else 0.22
-    for score, chunk in scored[:limit]:
-        if score < min_score:
+    for chunk in scored[:limit]:
+        if chunk.score < min_score:
             continue
         ids = _message_ids(chunk.message_ids)
         snippet = (chunk.text or "").replace("\n", " ")
@@ -213,7 +276,7 @@ def search_semantic(
                 source=chunk.source,
                 timestamp=chunk.timestamp,
                 text=chunk.text,
-                score=score,
+                score=chunk.score,
                 match_type="semantic",
             )
         )
@@ -227,20 +290,46 @@ def hybrid_retrieve(
     *,
     limit: int | None = None,
     conversation_ids: Sequence[str] | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    source: str | None = None,
 ) -> list[RetrievedChunk]:
     scoped = _normalize_ids(conversation_ids)
     top_n = limit or settings.retrieval_limit
     pool = max(top_n * 3, 12)
-    fts_hits, _ = search_fts(db, query, limit=pool, offset=0, conversation_ids=scoped)
+    fts_hits, _ = search_fts(
+        db,
+        query,
+        limit=pool,
+        offset=0,
+        conversation_ids=scoped,
+        date_from=date_from,
+        date_to=date_to,
+        source=source,
+    )
     semantic_hits = search_semantic(
-        db, query, settings, limit=pool, conversation_ids=scoped
+        db,
+        query,
+        settings,
+        limit=pool,
+        conversation_ids=scoped,
+        date_from=date_from,
+        date_to=date_to,
+        source=source,
     )
     fused = reciprocal_rank_fusion(fts_hits, semantic_hits, limit=top_n)
     if scoped:
         allowed = set(scoped)
         fused = [hit for hit in fused if hit.conversation_id in allowed]
         if not fused:
-            return fallback_conversation_chunks(db, scoped, limit=top_n)
+            return fallback_conversation_chunks(
+                db,
+                scoped,
+                limit=top_n,
+                date_from=date_from,
+                date_to=date_to,
+                source=source,
+            )
     return fused
 
 
@@ -249,17 +338,24 @@ def fallback_conversation_chunks(
     conversation_ids: Sequence[str],
     *,
     limit: int,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    source: str | None = None,
 ) -> list[RetrievedChunk]:
     """When a tagged chat has no query hits, still give Ask the tagged history."""
     scoped = _normalize_ids(conversation_ids)
     if not scoped:
         return []
 
+    filters = [MemoryChunk.conversation_id.in_(scoped)]
+    filters.extend(_chunk_time_filters(date_from, date_to))
+    if source:
+        filters.append(MemoryChunk.source == source)
     chunks = list(
         db.scalars(
             select(MemoryChunk)
-            .where(MemoryChunk.conversation_id.in_(scoped))
-            .order_by(MemoryChunk.timestamp.asc())
+            .where(*filters)
+            .order_by(MemoryChunk.timestamp.desc(), MemoryChunk.id.desc())
             .limit(min(16, max(limit, 8)))
         ).all()
     )
@@ -292,7 +388,15 @@ def fallback_conversation_chunks(
             )
         return hits
 
-    messages, _ = _messages_for_conversations(db, scoped, limit=min(16, max(limit, 8)), offset=0)
+    messages, _ = _messages_for_conversations(
+        db,
+        scoped,
+        limit=min(16, max(limit, 8)),
+        offset=0,
+        date_from=date_from,
+        date_to=date_to,
+        source=source,
+    )
     for hit in messages:
         hit.match_type = "tagged"
     return messages
@@ -304,21 +408,31 @@ def _messages_for_conversations(
     *,
     limit: int,
     offset: int,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    source: str | None = None,
 ) -> tuple[list[RetrievedChunk], int]:
     scoped = _normalize_ids(conversation_ids)
     if not scoped:
         return [], 0
+    filters = [Message.conversation_id.in_(scoped)]
+    filters.extend(_message_time_filters(date_from, date_to))
+    if source:
+        filters.append(Conversation.source == source)
     total = int(
         db.scalar(
-            select(func.count()).select_from(Message).where(Message.conversation_id.in_(scoped))
+            select(func.count())
+            .select_from(Message)
+            .join(Conversation, Conversation.id == Message.conversation_id)
+            .where(*filters)
         )
         or 0
     )
     stmt = (
         select(Message, Conversation)
         .join(Conversation, Conversation.id == Message.conversation_id)
-        .where(Message.conversation_id.in_(scoped))
-        .order_by(Message.sequence_number.asc(), Message.created_at.asc())
+        .where(*filters)
+        .order_by(Message.created_at.desc(), Message.sequence_number.desc())
         .offset(offset)
         .limit(limit)
     )
@@ -365,6 +479,62 @@ def _id_filter_sql(conversation_ids: Sequence[str] | None) -> tuple[str, dict[st
     return f" AND conversation_id IN ({placeholders})", params
 
 
+def _hit_filter_sql(
+    conversation_ids: Sequence[str] | None,
+    *,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    source: str | None = None,
+) -> tuple[str, dict[str, str]]:
+    sql, params = _id_filter_sql(conversation_ids)
+    if source and source.strip():
+        sql += " AND source = :hit_source"
+        params["hit_source"] = source.strip()
+    start, end = _fts_date_bounds(date_from, date_to)
+    if start:
+        sql += " AND created_at >= :date_from"
+        params["date_from"] = start
+    if end:
+        sql += " AND created_at <= :date_to"
+        params["date_to"] = end
+    return sql, params
+
+
+def _fts_date_bounds(
+    date_from: datetime | None, date_to: datetime | None
+) -> tuple[str | None, str | None]:
+    start = _as_fts_timestamp(date_from)
+    end = _as_fts_timestamp(date_to)
+    return start, end
+
+
+def _as_fts_timestamp(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    utc = value.astimezone(timezone.utc)
+    return utc.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _message_time_filters(date_from: datetime | None, date_to: datetime | None) -> list:
+    filters = []
+    if date_from is not None:
+        filters.append(Message.created_at >= date_from)
+    if date_to is not None:
+        filters.append(Message.created_at <= date_to)
+    return filters
+
+
+def _chunk_time_filters(date_from: datetime | None, date_to: datetime | None) -> list:
+    filters = []
+    if date_from is not None:
+        filters.append(MemoryChunk.timestamp >= date_from)
+    if date_to is not None:
+        filters.append(MemoryChunk.timestamp <= date_to)
+    return filters
+
+
 def reciprocal_rank_fusion(
     keyword_hits: list[RetrievedChunk],
     semantic_hits: list[RetrievedChunk],
@@ -374,6 +544,7 @@ def reciprocal_rank_fusion(
 ) -> list[RetrievedChunk]:
     scores: dict[str, float] = {}
     meta: dict[str, RetrievedChunk] = {}
+    now = datetime.now(timezone.utc)
 
     def add(hits: list[RetrievedChunk], weight: float) -> None:
         for rank, hit in enumerate(hits):
@@ -388,20 +559,36 @@ def reciprocal_rank_fusion(
     add(keyword_hits, 1.0)
     add(semantic_hits, 1.0)
 
-    ordered = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    ordered = sorted(
+        scores.items(),
+        key=lambda item: item[1] * _recency_weight(meta[item[0]].timestamp, now),
+        reverse=True,
+    )
     results: list[RetrievedChunk] = []
-    seen: set[str] = set()
+    seen_messages: set[str] = set()
     for key, score in ordered:
         hit = meta[key]
-        dedupe = f"{hit.conversation_id}:{hit.message_id}"
-        if dedupe in seen:
+        ids = set(hit.message_ids or [])
+        if hit.message_id:
+            ids.add(hit.message_id)
+        if ids & seen_messages:
             continue
-        seen.add(dedupe)
-        hit.score = score
+        seen_messages.update(ids)
+        hit.score = score * _recency_weight(hit.timestamp, now)
         results.append(hit)
         if len(results) >= limit:
             break
     return results
+
+
+def _recency_weight(value: datetime | None, now: datetime) -> float:
+    if value is None:
+        return 0.7
+    timestamp = value
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
+    age_days = max(0.0, (now - timestamp.astimezone(timezone.utc)).total_seconds() / 86400.0)
+    return 0.5 ** (age_days / RECENCY_HALF_LIFE_DAYS)
 
 
 def _message_ids(raw: str) -> list[str]:

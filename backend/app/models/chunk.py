@@ -14,6 +14,7 @@ class MemoryChunk(Base):
     __table_args__ = (
         Index("ix_chunks_conversation_id", "conversation_id"),
         Index("ix_chunks_source", "source"),
+        Index("ix_chunks_timestamp", "timestamp"),
     )
 
     id: Mapped[str] = mapped_column(

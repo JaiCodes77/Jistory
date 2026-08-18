@@ -1,17 +1,36 @@
 "use client"
 
 import { usePathname } from "next/navigation"
-import { Search } from "lucide-react"
+import { Menu, Search, X } from "lucide-react"
 
+import { ThemeToggle } from "@/components/layout/theme-toggle"
+import { Button } from "@/components/ui/button"
 import { getPageTitle } from "@/lib/navigation"
 
-export function TopNav() {
+type TopNavProps = {
+  mobileNavOpen?: boolean
+  onMenuClick?: () => void
+}
+
+export function TopNav({ mobileNavOpen = false, onMenuClick }: TopNavProps) {
   const pathname = usePathname()
   const title = getPageTitle(pathname)
 
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-background px-5">
       <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="md:hidden"
+          onClick={onMenuClick}
+          aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"}
+          aria-expanded={mobileNavOpen}
+          aria-controls="jistory-sidebar"
+        >
+          {mobileNavOpen ? <X /> : <Menu />}
+        </Button>
         <h1 className="text-sm font-medium tracking-tight">{title}</h1>
       </div>
       <div className="flex items-center gap-2">
@@ -27,6 +46,7 @@ export function TopNav() {
         <span className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground">
           Local
         </span>
+        <ThemeToggle />
       </div>
     </header>
   )

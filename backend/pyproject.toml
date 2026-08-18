@@ -1,6 +1,6 @@
 [project]
 name = "jistory"
-version = "1.0.0"
+version = "1.2.0"
 description = "Local-first AI conversation memory system"
 requires-python = ">=3.11,<3.14"
 dependencies = [

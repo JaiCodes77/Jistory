@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import sqlite3
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -224,3 +225,83 @@ def claude_share_html_for(conversation: dict[str, Any], *, login_wall: bool = Fa
         f'<script id="__NEXT_DATA__" type="application/json">{json.dumps(next_data)}</script>'
         "</body></html>"
     )
+
+
+def write_cursor_vscdb(
+    path: Path,
+    *,
+    composer_id: str = "composer-1",
+    title: str = "sqlite-vec vs FAISS",
+    bubbles: list[dict] | None = None,
+) -> Path:
+    """Write a minimal Cursor state.vscdb with composerData + bubbleId keys."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if bubbles is None:
+        bubbles = [
+            {
+                "bubbleId": "b-user",
+                "type": 1,
+                "text": "Should we keep Cursor embeddings in sqlite-vec?",
+                "createdAt": 1_700_000_000_000,
+            },
+            {
+                "bubbleId": "b-tool",
+                "type": 3,
+                "toolFormerData": {"tool": "read"},
+                "text": "",
+            },
+            {
+                "bubbleId": "b-asst",
+                "type": 2,
+                "text": "Yes. Stay in SQLite and skip hosted vector databases.",
+                "createdAt": 1_700_000_100_000,
+            },
+        ]
+
+    headers = [
+        {"bubbleId": str(item.get("bubbleId") or f"b-{index}"), "type": item.get("type")}
+        for index, item in enumerate(bubbles)
+    ]
+    composer = {
+        "composerId": composer_id,
+        "name": title,
+        "createdAt": 1_700_000_000_000,
+        "lastUpdatedAt": 1_700_000_100_000,
+        "fullConversationHeadersOnly": headers,
+    }
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute("CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value BLOB)")
+        conn.execute(
+            "INSERT INTO cursorDiskKV(key, value) VALUES (?, ?)",
+            (f"composerData:{composer_id}", json.dumps(composer)),
+        )
+        for item in bubbles:
+            bubble_id = str(item.get("bubbleId") or "")
+            conn.execute(
+                "INSERT INTO cursorDiskKV(key, value) VALUES (?, ?)",
+                (f"bubbleId:{composer_id}:{bubble_id}", json.dumps(item)),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return path
+
+
+def write_cursor_transcript(
+    path: Path,
+    *,
+    conversation_id: str = "composer-json-1",
+    title: str = "Local Cursor transcript",
+) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "id": conversation_id,
+        "title": title,
+        "messages": [
+            {"role": "user", "text": "What about Cursor composer transcripts?"},
+            {"role": "assistant", "text": "Import them from a file you choose."},
+        ],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path

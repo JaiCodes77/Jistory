@@ -6,6 +6,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.imports.chatgpt.persistence import delete_conversation_ids
 from app.models.conversation import Conversation
 from app.models.message import Message
 
@@ -97,6 +98,14 @@ def get_conversation(db: Session, conversation_id: str) -> Conversation:
     if row is None:
         raise AppError("Conversation not found.", code="not_found", status_code=404)
     return row
+
+
+def forget_conversation(db: Session, conversation_id: str) -> str:
+    row = get_conversation(db, conversation_id)
+    deleted_id = row.id
+    delete_conversation_ids(db, [deleted_id])
+    db.commit()
+    return deleted_id
 
 
 def list_messages(

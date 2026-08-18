@@ -57,3 +57,9 @@ class ConversationListQuery(BaseModel):
     date_from: datetime | None = None
     date_to: datetime | None = None
     sort: str = "newest"
+
+
+class ForgetResponse(BaseModel):
+    success: bool = True
+    id: str
+    conversations_deleted: int = 0

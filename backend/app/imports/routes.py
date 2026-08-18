@@ -1,16 +1,24 @@
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Body, Depends, File, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
+from app.core.errors import AppError
 from app.db.session import get_db
 from app.embeddings.runtime import get_embedding_status
+from app.imports.cursor.service import CursorImportService
 from app.imports.parse_service import ParseService
 from app.imports.service import ImportService
 from app.imports.share_service import ShareImportService
 from app.imports.validators import ImportValidationError
 from app.models.import_job import ImportJob
-from app.schemas.import_job import ImportErrorResponse, ImportJobResponse, ShareImportRequest
+from app.schemas.import_job import (
+    CursorImportRequest,
+    ImportDeleteResponse,
+    ImportErrorResponse,
+    ImportJobResponse,
+    ShareImportRequest,
+)
 from app.schemas.parse import ParseJobResponse
 
 router = APIRouter(prefix="/import", tags=["import"])
@@ -155,6 +163,66 @@ def import_claude_share(
 
 
 @router.post(
+    "/cursor",
+    response_model=ParseJobResponse,
+    responses={
+        400: {"model": ImportErrorResponse},
+        404: {"model": ImportErrorResponse},
+        503: {"model": ImportErrorResponse},
+    },
+)
+def import_cursor(
+    payload: CursorImportRequest | None = Body(default=None),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ParseJobResponse | JSONResponse:
+    """Import Cursor chats from an explicit local path or the saved Settings path."""
+    service = CursorImportService(db=db, settings=settings)
+    try:
+        return service.import_from_path(payload.path if payload else None)
+    except ImportValidationError as exc:
+        return _validation_error_response(exc)
+    except Exception:
+        return JSONResponse(
+            status_code=503,
+            content=ImportErrorResponse(
+                error="Server unavailable or failed to import Cursor data. Please try again.",
+                code="server_unavailable",
+            ).model_dump(),
+        )
+
+
+@router.post(
+    "/cursor/upload",
+    response_model=ParseJobResponse,
+    responses={
+        400: {"model": ImportErrorResponse},
+        413: {"model": ImportErrorResponse},
+        503: {"model": ImportErrorResponse},
+    },
+)
+async def import_cursor_upload(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ParseJobResponse | JSONResponse:
+    """Import a user-selected state.vscdb or transcript file. Never scans $HOME."""
+    service = CursorImportService(db=db, settings=settings)
+    try:
+        return await service.import_upload(file)
+    except ImportValidationError as exc:
+        return _validation_error_response(exc)
+    except Exception:
+        return JSONResponse(
+            status_code=503,
+            content=ImportErrorResponse(
+                error="Server unavailable or failed to import the Cursor file. Please try again.",
+                code="server_unavailable",
+            ).model_dump(),
+        )
+
+
+@router.post(
     "/{import_id}/parse",
     response_model=ParseJobResponse,
     responses={
@@ -212,6 +280,64 @@ def get_import_job(
             ).model_dump(),
         )
     return import_job_response(job)
+
+
+@router.delete(
+    "/{import_id}",
+    response_model=ImportDeleteResponse,
+    responses={404: {"model": ImportErrorResponse}},
+)
+def delete_import_job(
+    import_id: str,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ImportDeleteResponse | JSONResponse:
+    service = ImportService(db=db, settings=settings)
+    try:
+        return service.forget_import_job(import_id)
+    except AppError as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=ImportErrorResponse(error=exc.message, code=exc.code).model_dump(),
+        )
+
+
+@router.post(
+    "/{import_id}/reindex",
+    response_model=ImportJobResponse,
+    responses={
+        400: {"model": ImportErrorResponse},
+        404: {"model": ImportErrorResponse},
+    },
+)
+def reindex_import_job(
+    import_id: str,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ImportJobResponse | JSONResponse:
+    """Rebuild embeddings for an import that already parsed. Used after index_error."""
+    service = ImportService(db=db, settings=settings)
+    try:
+        job = service.reindex_import_job(import_id)
+    except AppError as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=ImportErrorResponse(error=exc.message, code=exc.code).model_dump(),
+        )
+    return import_job_response(job)
+
+
+def _validation_error_response(exc: ImportValidationError) -> JSONResponse:
+    if exc.code == "file_too_large":
+        status_code = 413
+    elif exc.code in {"share_not_found", "import_not_found"}:
+        status_code = 404
+    else:
+        status_code = 400
+    return JSONResponse(
+        status_code=status_code,
+        content=ImportErrorResponse(error=exc.message, code=exc.code).model_dump(),
+    )
 
 
 def _import_share(

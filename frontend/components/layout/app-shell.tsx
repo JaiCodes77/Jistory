@@ -1,3 +1,7 @@
+"use client"
+
+import { useEffect, useState } from "react"
+
 import { Sidebar } from "@/components/layout/sidebar"
 import { TopNav } from "@/components/layout/top-nav"
 
@@ -6,11 +10,52 @@ type AppShellProps = {
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 768px)")
+    const onChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setMobileNavOpen(false)
+      }
+    }
+    media.addEventListener("change", onChange)
+    return () => media.removeEventListener("change", onChange)
+  }, [])
+
+  useEffect(() => {
+    if (!mobileNavOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileNavOpen(false)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    const previous = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      window.removeEventListener("keydown", onKeyDown)
+      document.body.style.overflow = previous
+    }
+  }, [mobileNavOpen])
+
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      <Sidebar />
+      <Sidebar
+        mobileOpen={mobileNavOpen}
+        onNavigate={() => setMobileNavOpen(false)}
+      />
+      {mobileNavOpen ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          aria-label="Close navigation"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      ) : null}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <TopNav />
+        <TopNav
+          mobileNavOpen={mobileNavOpen}
+          onMenuClick={() => setMobileNavOpen((open) => !open)}
+        />
         <main className="flex min-h-0 flex-1 flex-col overflow-auto">{children}</main>
       </div>
     </div>

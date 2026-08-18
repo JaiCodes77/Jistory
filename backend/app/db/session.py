@@ -72,7 +72,19 @@ def _ensure_sqlite_columns(conn: Connection) -> None:
             ("conversations_skipped", "INTEGER"),
             ("chunks_indexed", "INTEGER"),
             ("index_error", "TEXT"),
-        ]
+        ],
+        "ask_sessions": [
+            ("title", "TEXT"),
+            ("tagged_conversation_ids", "TEXT"),
+        ],
+        "memory_chunks": [
+            ("source", "VARCHAR(64)"),
+            ("timestamp", "DATETIME"),
+            ("text", "TEXT"),
+            ("message_ids", "TEXT"),
+            ("embedding", "BLOB"),
+            ("embedding_model", "VARCHAR(128)"),
+        ],
     }
 
     for table, columns in alterations.items():
@@ -147,6 +159,16 @@ def _ensure_unique_indexes(conn: Connection) -> None:
     )
 
 
+def _ensure_runtime_indexes(conn: Connection) -> None:
+    if not _is_sqlite(conn):
+        return
+    columns = _table_columns(conn, "memory_chunks")
+    if "timestamp" in columns:
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_chunks_timestamp ON memory_chunks (timestamp)")
+        )
+
+
 def ensure_runtime_schema(bind: Engine | Connection) -> None:
     """Additive SQLite upgrades used at startup and by Alembic.
 
@@ -157,9 +179,11 @@ def ensure_runtime_schema(bind: Engine | Connection) -> None:
         with bind.begin() as conn:
             _ensure_sqlite_columns(conn)
             _ensure_unique_indexes(conn)
+            _ensure_runtime_indexes(conn)
         return
     _ensure_sqlite_columns(bind)
     _ensure_unique_indexes(bind)
+    _ensure_runtime_indexes(bind)
 
 
 def init_db() -> None:

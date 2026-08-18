@@ -17,7 +17,7 @@ Jistory is not a general-purpose chatbot. If your history does not contain the a
 ## Architecture
 
 ```text
-ChatGPT ZIP or Claude ZIP
+ChatGPT ZIP, Claude ZIP, or Cursor state.vscdb
     → validate / extract (local)
     → parse into conversations + messages (SQLite)
     → FTS5 keyword index + local embeddings
@@ -25,7 +25,7 @@ ChatGPT ZIP or Claude ZIP
     → Gemini Flash (only retrieved excerpts, only on Ask)
 ```
 
-Frontend and backend stay separate. Provider integrations are abstracted (`ConversationParser`, `EmbeddingProvider`, `LLMProvider`) so Gemini or Cursor imports can be added later without rewriting retrieval.
+Frontend and backend stay separate. Provider integrations are abstracted (`ConversationParser`, `EmbeddingProvider`, `LLMProvider`) so a Gemini importer can be added later without rewriting retrieval.
 
 ## Tech stack
 
@@ -109,6 +109,18 @@ You can also paste a public `chatgpt.com/share/...` link to import one chat with
 
 Public `claude.ai/share/...` links work the same way as ChatGPT shares. Private `claude.ai/chat/...` URLs are rejected.
 
+### Cursor
+
+Cursor has no ChatGPT-style export ZIP. Import is local-file only from a path you choose (Settings or the Import card). Jistory never scans `$HOME` or `~/Library` by default.
+
+Typical file: `state.vscdb` (SQLite). Layouts change across Cursor versions; the importer currently reads:
+
+- `cursorDiskKV` / `ItemTable` keys `composerData:{id}` and `bubbleId:{composerId}:{bubbleId}`
+- `fullConversationHeadersOnly[].type`: 1 = user, 2 = assistant; empty tool bubbles are skipped
+- A folder of `.json` / `.jsonl` transcripts with `messages` / `bubbles`
+
+`external_id` is the composer/chat id, so re-importing the same file updates the existing conversation. Public Cursor share URLs are rejected.
+
 Parse stores conversations immediately, then indexes embeddings in a background thread. Import shows **Indexing embeddings** (including the first FastEmbed model download) until status is **Ready**. Keyword search works as soon as parse finishes.
 
 Exports are extracted under `backend/data/imports/<timestamp>/`. Parsing is idempotent: the same conversation is not duplicated if you import or parse the same export again. Existing SQLite databases get an additive unique index on `(source, external_id)` at startup; Jistory never deletes `backend/data/jistory.db` to apply schema changes.
@@ -127,7 +139,7 @@ Follow-up questions keep a bounded Ask session so “Why did I choose it?” can
 
 | Stays on this machine | Leaves the machine |
 | --- | --- |
-| ZIP exports, conversations, messages | Nothing, unless you use Ask Jistory |
+| ZIP exports, Cursor `state.vscdb` copies, conversations, messages | Nothing, unless you use Ask Jistory |
 | Full-text index and embeddings | Retrieved excerpts + recent Ask turns, sent to Gemini for an answer |
 | Settings file and API key | The API key is sent only to Google as Gemini authentication |
 

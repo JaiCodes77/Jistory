@@ -1,5 +1,6 @@
 import { AlertCircle, CheckCircle2, LoaderCircle } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
 import { importNextStep } from "@/lib/labels"
 
 export type IndexBannerState = {
@@ -11,7 +12,15 @@ export type IndexBannerState = {
   embeddingDetail: string | null
 }
 
-export function ImportIndexBanner({ state }: { state: IndexBannerState }) {
+export function ImportIndexBanner({
+  state,
+  onReindex,
+  reindexing = false,
+}: {
+  state: IndexBannerState
+  onReindex?: () => void
+  reindexing?: boolean
+}) {
   if (state.indexing) {
     return (
       <div className="rounded-xl border border-foreground/25 bg-muted/50 px-4 py-3">
@@ -41,6 +50,18 @@ export function ImportIndexBanner({ state }: { state: IndexBannerState }) {
             <p className="mt-1 text-xs text-destructive/90">
               Next: {importNextStep("index", state.indexError)}
             </p>
+            {onReindex && (
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                className="mt-2"
+                disabled={reindexing}
+                onClick={onReindex}
+              >
+                {reindexing ? "Reindexing…" : "Reindex embeddings"}
+              </Button>
+            )}
           </div>
         </div>
       </div>

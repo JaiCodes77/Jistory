@@ -14,12 +14,15 @@ def _registry() -> dict[str, type[ConversationParser]]:
     if PARSER_REGISTRY is None:
         from app.imports.parsers.chatgpt import ChatGPTParser
         from app.imports.parsers.claude import ClaudeParser
+        from app.imports.parsers.cursor import CursorParser
 
         PARSER_REGISTRY = {
             "ChatGPT": ChatGPTParser,
             "chatgpt": ChatGPTParser,
             "Claude": ClaudeParser,
             "claude": ClaudeParser,
+            "Cursor": CursorParser,
+            "cursor": CursorParser,
         }
     return PARSER_REGISTRY
 

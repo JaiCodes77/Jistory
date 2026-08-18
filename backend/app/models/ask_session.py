@@ -26,6 +26,9 @@ class AskSession(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
+    title: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    tagged_conversation_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     turns = relationship(
         "AskTurn",
         back_populates="session",

@@ -33,6 +33,27 @@ def delete_import_conversations(db: Session, import_job_id: str) -> int:
     return len(existing_ids)
 
 
+def delete_conversation_ids(db: Session, conversation_ids: list[str]) -> int:
+    """Delete conversations plus messages and embedding chunks. FTS rows follow via triggers."""
+    unique: list[str] = []
+    seen: set[str] = set()
+    for raw in conversation_ids:
+        value = (raw or "").strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        unique.append(value)
+    if not unique:
+        return 0
+    existing_ids = list(
+        db.scalars(select(Conversation.id).where(Conversation.id.in_(unique))).all()
+    )
+    if not existing_ids:
+        return 0
+    _delete_conversation_ids(db, existing_ids)
+    return len(existing_ids)
+
+
 def _delete_conversation_ids(db: Session, conversation_ids: list[str]) -> None:
     db.execute(
         update(Message)
