@@ -83,6 +83,25 @@ export function DashboardView() {
         </div>
       </section>
 
+      <section className="rounded-xl border border-border bg-card px-4 py-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-medium">Memory graph</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {(data.graph_edges ?? 0) === 0
+                ? "Links appear after indexing, when conversations share topics or similar content."
+                : `${(data.graph_connected ?? 0).toLocaleString()} conversations connected by ${(data.graph_edges ?? 0).toLocaleString()} links.`}
+            </p>
+          </div>
+          <Link
+            href="/graph"
+            className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-sm hover:bg-muted"
+          >
+            Open graph
+          </Link>
+        </div>
+      </section>
+
       {data.latest_import && (
         <section className="rounded-xl border border-border bg-card px-4 py-3">
           <h3 className="text-sm font-medium">Most recent import</h3>

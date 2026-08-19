@@ -19,6 +19,7 @@ import {
   conversationTitle,
   deleteAskSession,
   getAskSession,
+  getConversation,
   getDashboard,
   getSettings,
   listAskSessions,
@@ -42,6 +43,7 @@ export function AskChat() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const sessionParam = searchParams.get("session")
+  const tagParam = searchParams.get("tag")
   const [input, setInput] = useState("")
   const [caret, setCaret] = useState(0)
   const [items, setItems] = useState<ChatItem[]>([])
@@ -92,6 +94,24 @@ export function AskChat() {
     setInput("")
     setCaret(0)
   }, [])
+
+  useEffect(() => {
+    if (!tagParam || sessionParam) return
+    let cancelled = false
+    void getConversation(tagParam)
+      .then((conversation) => {
+        if (cancelled) return
+        setTags((current) =>
+          current.some((tag) => tag.id === conversation.id)
+            ? current
+            : [...current, conversation].slice(0, MAX_TAGGED_CONVERSATIONS)
+        )
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [tagParam, sessionParam])
 
   useEffect(() => {
     if (!sessionParam) {

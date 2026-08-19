@@ -5,7 +5,10 @@ import type {
   ConversationListResponse,
   ConversationSummary,
   DashboardResponse,
+  GraphRebuildResponse,
+  GraphResponse,
   MessageListResponse,
+  RelatedConversation,
   SearchResponse,
   SourceReference,
   UserSettings,
@@ -18,11 +21,29 @@ import type {
 } from "@/types/import"
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api"
+  process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api"
 
 export function getApiUrl(path: string = ""): string {
   const normalized = path.startsWith("/") ? path : `/${path}`
-  return `${API_BASE_URL}${normalized === "/" ? "" : normalized}`
+  const suffix = normalized === "/" ? "" : normalized
+  return `${apiBaseUrl()}${suffix}`
+}
+
+function apiBaseUrl(): string {
+  if (typeof window === "undefined") return API_BASE_URL
+  try {
+    const api = new URL(API_BASE_URL)
+    const pageHost = window.location.hostname
+    if (
+      (pageHost === "127.0.0.1" && api.hostname === "localhost") ||
+      (pageHost === "localhost" && api.hostname === "127.0.0.1")
+    ) {
+      api.hostname = pageHost
+    }
+    return api.toString().replace(/\/$/, "")
+  } catch {
+    return API_BASE_URL
+  }
 }
 
 export function formatBytes(bytes: number): string {
@@ -415,6 +436,36 @@ export async function deleteAskSession(id: string): Promise<void> {
 
 export async function getDashboard(): Promise<DashboardResponse> {
   return apiFetch<DashboardResponse>("/dashboard")
+}
+
+export async function getMemoryGraph(options?: {
+  source?: string
+  dateFrom?: string
+  dateTo?: string
+  minWeight?: number
+  includeIsolated?: boolean
+}): Promise<GraphResponse> {
+  const params = new URLSearchParams()
+  if (options?.source) params.set("source", options.source)
+  if (options?.dateFrom) params.set("date_from", options.dateFrom)
+  if (options?.dateTo) params.set("date_to", options.dateTo)
+  if (options?.minWeight != null) params.set("min_weight", String(options.minWeight))
+  if (options?.includeIsolated === false) params.set("include_isolated", "false")
+  const query = params.toString()
+  return apiFetch<GraphResponse>(`/graph${query ? `?${query}` : ""}`)
+}
+
+export async function rebuildMemoryGraph(): Promise<GraphRebuildResponse> {
+  return apiFetch<GraphRebuildResponse>("/graph/rebuild", { method: "POST" })
+}
+
+export async function getRelatedConversations(
+  id: string,
+  limit = 8
+): Promise<{ items: RelatedConversation[] }> {
+  return apiFetch<{ items: RelatedConversation[] }>(
+    `/conversations/${id}/related?limit=${limit}`
+  )
 }
 
 export async function getSettings(): Promise<UserSettings> {

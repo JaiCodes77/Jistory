@@ -11,6 +11,7 @@ from app.conversations.service import (
 )
 from app.core.errors import AppError
 from app.db.session import get_db
+from app.graph.service import list_related
 from app.models.conversation import Conversation
 from app.models.import_job import ImportSource
 from app.schemas.conversation import (
@@ -21,6 +22,7 @@ from app.schemas.conversation import (
     MessageItem,
     MessageListResponse,
 )
+from app.schemas.graph import RelatedResponse
 from app.schemas.import_job import ImportErrorResponse
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
@@ -107,6 +109,22 @@ def delete_conversation(
     except AppError as exc:
         return _error(exc)
     return ForgetResponse(success=True, id=deleted_id, conversations_deleted=1)
+
+
+@router.get(
+    "/{conversation_id}/related",
+    response_model=RelatedResponse,
+    responses={404: {"model": ImportErrorResponse}},
+)
+def get_related_conversations(
+    conversation_id: str,
+    limit: int = Query(8, ge=1, le=20),
+    db: Session = Depends(get_db),
+) -> RelatedResponse | JSONResponse:
+    try:
+        return list_related(db, conversation_id, limit=limit)
+    except AppError as exc:
+        return _error(exc)
 
 
 @router.get("/{conversation_id}", response_model=ConversationDetail)

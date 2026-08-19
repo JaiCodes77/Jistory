@@ -1,15 +1,19 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
 
 import { Sidebar } from "@/components/layout/sidebar"
 import { TopNav } from "@/components/layout/top-nav"
+import { cn } from "@/lib/utils"
 
 type AppShellProps = {
   children: React.ReactNode
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const pathname = usePathname()
+  const fillViewport = pathname.startsWith("/graph")
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   useEffect(() => {
@@ -56,7 +60,14 @@ export function AppShell({ children }: AppShellProps) {
           mobileNavOpen={mobileNavOpen}
           onMenuClick={() => setMobileNavOpen((open) => !open)}
         />
-        <main className="flex min-h-0 flex-1 flex-col overflow-auto">{children}</main>
+        <main
+          className={cn(
+            "flex min-h-0 flex-1 flex-col",
+            fillViewport ? "overflow-hidden" : "overflow-auto"
+          )}
+        >
+          {children}
+        </main>
       </div>
     </div>
   )

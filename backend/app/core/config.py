@@ -18,11 +18,11 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Jistory"
-    app_version: str = "1.2.0"
+    app_version: str = "2.0.0"
     debug: bool = True
     api_prefix: str = "/api"
 
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     database_url: str = f"sqlite:///{DATA_DIR / 'jistory.db'}"
 

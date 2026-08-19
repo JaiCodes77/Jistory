@@ -58,10 +58,10 @@ def test_source_dropdown_hides_unbuilt_importers(client: TestClient) -> None:
     assert "Cursor" in sources["items"]
 
 
-def test_app_version_default_is_1_2() -> None:
+def test_app_version_default_is_2_0() -> None:
     from app.core.config import Settings
 
-    assert Settings.model_fields["app_version"].default == "1.2.0"
+    assert Settings.model_fields["app_version"].default == "2.0.0"
 
 
 def test_overlapping_chunks_are_deduped() -> None:

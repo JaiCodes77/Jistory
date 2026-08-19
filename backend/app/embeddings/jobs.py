@@ -69,10 +69,12 @@ def _index(import_job_id: str) -> None:
         db.add(job)
         db.commit()
         logger.info("Indexed import job chunks=%s", count)
+        _rebuild_graph(db)
     except EmbeddingUnavailableError as exc:
         db.rollback()
         _mark_parsed_with_error(db, import_job_id, exc.message)
         set_embedding_status("unavailable", exc.message)
+        _rebuild_graph(db)
     except Exception:
         logger.exception("Embedding index failed")
         db.rollback()
@@ -81,8 +83,28 @@ def _index(import_job_id: str) -> None:
             import_job_id,
             "Keyword search is ready, but semantic indexing failed. Try parsing again.",
         )
+        _rebuild_graph(db)
     finally:
         db.close()
+
+
+def _rebuild_graph(db) -> None:
+    try:
+        from app.graph.builder import rebuild_conversation_edges
+
+        rebuild_conversation_edges(db)
+        db.commit()
+    except Exception:
+        logger.exception("Memory graph rebuild failed")
+        db.rollback()
+        try:
+            from app.graph.builder import invalidate_graph
+
+            invalidate_graph(db)
+            db.commit()
+        except Exception:
+            logger.exception("Could not invalidate memory graph after rebuild failure")
+            db.rollback()
 
 
 def _mark_parsed_with_error(db, import_job_id: str, message: str) -> None:

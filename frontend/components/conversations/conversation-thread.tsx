@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 
 import { ExpandableMessage } from "@/components/conversations/expandable-message"
 import { ForgetButton } from "@/components/conversations/forget-button"
+import { RelatedConversations } from "@/components/graph/related-conversations"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CopyTextButton } from "@/components/ui/copy-text-button"
@@ -258,7 +259,8 @@ export function ConversationThread({ conversationId }: { conversationId: string 
   }
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-1 flex-col px-6 py-6">
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden lg:flex-row">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-1 flex-col px-6 py-6">
       <Link href="/conversations" className="mb-4 text-xs text-muted-foreground hover:text-foreground">
         ← Conversations
       </Link>
@@ -289,6 +291,9 @@ export function ConversationThread({ conversationId }: { conversationId: string 
             <span>Created {formatDate(conversation.created_at)}</span>
             <span>Updated {formatImportedAt(conversation.updated_at)}</span>
             <span>{conversation.message_count.toLocaleString()} messages</span>
+          </div>
+          <div className="mt-4 lg:hidden">
+            <RelatedConversations key={conversationId} conversationId={conversationId} compact />
           </div>
         </div>
       )}
@@ -359,6 +364,10 @@ export function ConversationThread({ conversationId }: { conversationId: string 
           </p>
         )}
       </div>
+      </div>
+      <aside className="hidden min-h-0 w-80 shrink-0 overflow-auto border-l border-border lg:block">
+        <RelatedConversations key={conversationId} conversationId={conversationId} />
+      </aside>
     </div>
   )
 }

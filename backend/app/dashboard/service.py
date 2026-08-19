@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import re
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.graph.service import graph_counts
+from app.graph.topics import STOPWORDS, TOKEN_RE
 from app.models.conversation import Conversation
 from app.models.import_job import ImportJob
 from app.models.message import Message
@@ -18,42 +19,6 @@ from app.schemas.dashboard import (
     TimeBucket,
     TopicCount,
 )
-
-STOPWORDS = frozenset(
-    {
-        "a",
-        "an",
-        "and",
-        "the",
-        "of",
-        "to",
-        "for",
-        "in",
-        "on",
-        "with",
-        "about",
-        "from",
-        "how",
-        "what",
-        "why",
-        "is",
-        "it",
-        "my",
-        "we",
-        "you",
-        "your",
-        "vs",
-        "or",
-        "into",
-        "using",
-        "use",
-        "new",
-        "untitled",
-        "conversation",
-        "chat",
-    }
-)
-TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9_+-]{2,}")
 
 
 def get_dashboard(db: Session) -> DashboardResponse:
@@ -95,6 +60,7 @@ def get_dashboard(db: Session) -> DashboardResponse:
 
     time_buckets = _conversations_over_time(db)
     topics = _frequent_topics(db)
+    graph_edges, graph_connected = graph_counts(db)
 
     return DashboardResponse(
         total_conversations=total_conversations,
@@ -104,6 +70,8 @@ def get_dashboard(db: Session) -> DashboardResponse:
         conversations_over_time=time_buckets,
         recent_conversations=recent,
         frequent_topics=topics,
+        graph_edges=graph_edges,
+        graph_connected=graph_connected,
     )
 
 

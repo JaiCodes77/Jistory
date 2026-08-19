@@ -5,13 +5,14 @@ from __future__ import annotations
 import logging
 import uuid
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.imports.chatgpt.parser import iter_conversation_batches
 from app.imports.parsers.base import ParsedConversation
 from app.models.chunk import MemoryChunk
 from app.models.conversation import Conversation
+from app.models.graph import ConversationEdge
 from app.models.message import Message
 
 logger = logging.getLogger("jistory.persistence")
@@ -34,7 +35,7 @@ def delete_import_conversations(db: Session, import_job_id: str) -> int:
 
 
 def delete_conversation_ids(db: Session, conversation_ids: list[str]) -> int:
-    """Delete conversations plus messages and embedding chunks. FTS rows follow via triggers."""
+    """Delete conversations plus messages, embedding chunks, and graph edges. FTS rows follow via triggers."""
     unique: list[str] = []
     seen: set[str] = set()
     for raw in conversation_ids:
@@ -61,6 +62,14 @@ def _delete_conversation_ids(db: Session, conversation_ids: list[str]) -> None:
         .values(parent_message_id=None)
     )
     db.execute(delete(MemoryChunk).where(MemoryChunk.conversation_id.in_(conversation_ids)))
+    db.execute(
+        delete(ConversationEdge).where(
+            or_(
+                ConversationEdge.source_id.in_(conversation_ids),
+                ConversationEdge.target_id.in_(conversation_ids),
+            )
+        )
+    )
     db.execute(delete(Message).where(Message.conversation_id.in_(conversation_ids)))
     db.execute(delete(Conversation).where(Conversation.id.in_(conversation_ids)))
     db.flush()
@@ -103,6 +112,14 @@ def persist_conversations(
                 .values(parent_message_id=None)
             )
             db.execute(delete(MemoryChunk).where(MemoryChunk.conversation_id.in_(reuse_ids)))
+            db.execute(
+                delete(ConversationEdge).where(
+                    or_(
+                        ConversationEdge.source_id.in_(reuse_ids),
+                        ConversationEdge.target_id.in_(reuse_ids),
+                    )
+                )
+            )
             db.execute(delete(Message).where(Message.conversation_id.in_(reuse_ids)))
             db.flush()
 

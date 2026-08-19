@@ -112,6 +112,8 @@ export type DashboardResponse = {
     message_count: number
   }[]
   frequent_topics: { term: string; count: number }[]
+  graph_edges: number
+  graph_connected: number
 }
 
 export type UserSettings = {
@@ -137,4 +139,48 @@ export type ConversationFilters = {
   dateFrom: string
   dateTo: string
   sort: string
+}
+
+export type GraphNode = {
+  id: string
+  title: string | null
+  source: string
+  message_count: number
+  created_at: string | null
+  last_message_at: string | null
+  snippet: string
+  degree: number
+  topics: string[]
+}
+
+export type GraphEdge = {
+  source_id: string
+  target_id: string
+  weight: number
+  reason: string
+}
+
+export type GraphResponse = {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  built_at: string | null
+  truncated: boolean
+  isolated: number
+}
+
+export type GraphRebuildResponse = {
+  nodes: number
+  edges: number
+  built_at: string | null
+}
+
+export type RelatedConversation = {
+  id: string
+  title: string | null
+  source: string
+  message_count: number
+  last_message_at: string | null
+  snippet: string
+  weight: number
+  reason: string
 }

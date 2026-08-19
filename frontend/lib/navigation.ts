@@ -3,6 +3,7 @@ import {
   MessageSquareText,
   Search,
   Settings,
+  Share2,
   Sparkles,
   Upload,
 } from "lucide-react"
@@ -26,6 +27,11 @@ export const mainNav: NavItem[] = [
     icon: MessageSquareText,
   },
   {
+    title: "Graph",
+    href: "/graph",
+    icon: Share2,
+  },
+  {
     title: "Search",
     href: "/search",
     icon: Search,
@@ -44,6 +50,7 @@ export const mainNav: NavItem[] = [
 
 export function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/search")) return "Search"
+  if (pathname.startsWith("/graph")) return "Graph"
   if (pathname.startsWith("/conversations/") && pathname !== "/conversations") {
     return "Conversation"
   }

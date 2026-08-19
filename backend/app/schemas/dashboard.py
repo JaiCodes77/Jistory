@@ -43,6 +43,8 @@ class DashboardResponse(BaseModel):
     conversations_over_time: list[TimeBucket]
     recent_conversations: list[RecentConversation]
     frequent_topics: list[TopicCount]
+    graph_edges: int = 0
+    graph_connected: int = 0
 
 
 class UserSettingsPublic(BaseModel):
