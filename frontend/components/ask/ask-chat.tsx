@@ -374,7 +374,7 @@ export function AskChat() {
       ) : (
         <>
           {apiKeyConfigured === false && (
-            <div className="mb-4 rounded-xl border border-border px-4 py-3 text-sm">
+            <div className="surface mb-4 rounded-xl px-4 py-3 text-sm">
               <p className="font-medium">Gemini is not configured.</p>
               <p className="mt-1 text-muted-foreground">
                 Add GEMINI_API_KEY in Settings or your backend .env file to generate answers.
@@ -397,8 +397,8 @@ export function AskChat() {
           <div
             key={`${item.role}-${index}`}
             className={cn(
-              "rounded-xl border border-border px-4 py-3",
-              item.role === "user" ? "bg-muted/40" : "bg-card"
+              "rounded-xl border border-border/80 px-4 py-3",
+              item.role === "user" ? "bg-muted/35" : "bg-card/80 backdrop-blur-md"
             )}
           >
             <div className="mb-2 flex items-center justify-between gap-2">
@@ -462,7 +462,7 @@ export function AskChat() {
                 onSelect={selectMention}
               />
             )}
-            <div className="rounded-lg border border-border bg-background focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+            <div className="rounded-xl border border-border/80 bg-card/70 backdrop-blur-md focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/40">
               <div className="px-3 pt-2">
                 <DateRangeChips
                   range={dateRange}

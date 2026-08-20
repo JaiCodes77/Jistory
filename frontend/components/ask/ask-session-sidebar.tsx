@@ -21,7 +21,7 @@ export function AskSessionSidebar({
   onDelete: (id: string) => void
 }) {
   return (
-    <aside className="flex h-full min-h-0 w-56 shrink-0 flex-col border-r border-border bg-card/40 max-md:h-auto max-md:max-h-32 max-md:w-full max-md:border-r-0 max-md:border-b">
+    <aside className="flex h-full min-h-0 w-56 shrink-0 flex-col border-r border-border/80 bg-card/30 backdrop-blur-md max-md:h-auto max-md:max-h-32 max-md:w-full max-md:border-r-0 max-md:border-b">
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-3 max-md:py-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Sessions
@@ -45,7 +45,7 @@ export function AskSessionSidebar({
                   <div
                     className={cn(
                       "flex items-start gap-1 rounded-lg px-2 py-1.5 max-md:w-44",
-                      active ? "bg-muted" : "hover:bg-muted/50"
+                      active ? "bg-sidebar-accent" : "hover:bg-muted/50"
                     )}
                   >
                     <button

@@ -359,7 +359,7 @@ export function ForceGraphCanvas({
       />
       {hover && (
         <div
-          className="pointer-events-none absolute z-10 w-72 rounded-lg border border-border bg-card px-3 py-2"
+          className="pointer-events-none absolute z-10 w-72 rounded-xl border border-border/80 bg-card/90 px-3 py-2 shadow-[inset_0_1px_0_oklch(1_0_0/0.06)] backdrop-blur-xl"
           style={{
             left: Math.max(8, Math.min(hover.x + 14, hover.wrapW - 300)),
             top: Math.max(8, Math.min(hover.y + 14, hover.wrapH - 132)),
@@ -538,10 +538,10 @@ function drawGraph(
   const dark = document.documentElement.classList.contains("dark")
   drawPaper(ctx, width, height, dark)
 
-  const muted = dark ? "rgba(212,212,216,0.92)" : "rgba(63,63,70,0.92)"
-  const labelBg = dark ? "rgba(24,24,27,0.86)" : "rgba(255,255,255,0.92)"
-  const dimEdge = dark ? "rgba(250,250,250,0.07)" : "rgba(24,24,27,0.07)"
-  const liveEdge = dark ? "rgba(250,250,250,0.4)" : "rgba(24,24,27,0.3)"
+  const muted = dark ? "rgba(226,232,240,0.9)" : "rgba(30,41,59,0.9)"
+  const labelBg = dark ? "rgba(12,16,26,0.88)" : "rgba(255,255,255,0.92)"
+  const dimEdge = dark ? "rgba(94,214,214,0.1)" : "rgba(15,90,110,0.1)"
+  const liveEdge = dark ? "rgba(94,214,214,0.46)" : "rgba(15,90,110,0.34)"
   const focus = neighborhood(selectedId, edges)
   const hasFocus = focus.size > 0
 
@@ -594,7 +594,7 @@ function drawGraph(
     ctx.fillStyle = sourceFill(node.source, dark)
     ctx.fill()
     ctx.lineWidth = 1 / transform.k
-    ctx.strokeStyle = dark ? "rgba(9,9,11,0.55)" : "rgba(255,255,255,0.8)"
+    ctx.strokeStyle = dark ? "rgba(8,12,20,0.55)" : "rgba(255,255,255,0.85)"
     ctx.stroke()
   }
 
@@ -632,7 +632,7 @@ function drawPaper(
   dark: boolean
 ) {
   const gap = 22
-  ctx.fillStyle = dark ? "rgba(250,250,250,0.035)" : "rgba(24,24,27,0.045)"
+  ctx.fillStyle = dark ? "rgba(94,214,214,0.07)" : "rgba(15,90,110,0.06)"
   for (let x = 12; x < width; x += gap) {
     for (let y = 12; y < height; y += gap) {
       ctx.beginPath()

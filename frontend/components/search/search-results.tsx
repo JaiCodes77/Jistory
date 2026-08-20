@@ -171,7 +171,7 @@ export function SearchResults() {
           <Link
             key={`${hit.conversation_id}:${hit.message_id}:${hit.score}`}
             href={`/conversations/${hit.conversation_id}?message=${hit.message_id}`}
-            className="rounded-xl border border-border bg-card px-4 py-3 hover:bg-muted/40"
+            className="surface rounded-xl px-4 py-3 hover:bg-muted/40"
           >
             <div className="flex items-center justify-between gap-3">
               <p className="truncate text-sm font-medium">

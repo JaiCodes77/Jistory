@@ -23,7 +23,7 @@ export function ImportIndexBanner({
 }) {
   if (state.indexing) {
     return (
-      <div className="rounded-xl border border-foreground/25 bg-muted/50 px-4 py-3">
+      <div className="rounded-xl border border-primary/25 bg-primary/8 px-4 py-3">
         <div className="flex items-start gap-2">
           <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin" />
           <div>

@@ -25,10 +25,10 @@ const PAGE_SIZE = 80
 const MAX_RENDERED = 160
 
 const ROLE_STYLES: Record<string, string> = {
-  user: "border-border bg-muted/40",
-  assistant: "border-border bg-card",
-  system: "border-border bg-background text-muted-foreground",
-  tool: "border-border bg-background text-muted-foreground",
+  user: "border-border/80 bg-muted/35",
+  assistant: "border-border/80 bg-card/80 backdrop-blur-md",
+  system: "border-border/80 bg-background/50 text-muted-foreground",
+  tool: "border-border/80 bg-background/50 text-muted-foreground",
 }
 
 function mergeMessages(current: MessageItem[], incoming: MessageItem[]): MessageItem[] {
@@ -324,7 +324,7 @@ export function ConversationThread({ conversationId }: { conversationId: string 
               "scroll-mt-6 rounded-xl border px-4 py-3",
               ROLE_STYLES[message.role] ?? ROLE_STYLES.system,
               highlightId === message.id &&
-                "border-foreground bg-muted ring-2 ring-foreground/40"
+                "border-primary/40 bg-primary/8 ring-2 ring-primary/35"
             )}
           >
             <div className="mb-2 flex items-center justify-between gap-3">
@@ -365,7 +365,7 @@ export function ConversationThread({ conversationId }: { conversationId: string 
         )}
       </div>
       </div>
-      <aside className="hidden min-h-0 w-80 shrink-0 overflow-auto border-l border-border lg:block">
+      <aside className="hidden min-h-0 w-80 shrink-0 overflow-auto border-l border-border/80 bg-background/50 backdrop-blur-xl lg:block">
         <RelatedConversations key={conversationId} conversationId={conversationId} />
       </aside>
     </div>

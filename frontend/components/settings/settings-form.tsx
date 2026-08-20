@@ -81,7 +81,7 @@ export function SettingsForm() {
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-8">
       <PageIntro description="Secrets stay on this machine. They are never returned by the API." />
 
-      <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
+      <section className="surface flex flex-col gap-4 rounded-xl p-4">
         <div>
           <h3 className="text-sm font-medium">AI</h3>
           <p className="text-xs text-muted-foreground">
@@ -121,7 +121,7 @@ export function SettingsForm() {
         </div>
       </section>
 
-      <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
+      <section className="surface flex flex-col gap-4 rounded-xl p-4">
         <div>
           <h3 className="text-sm font-medium">Search</h3>
           <p className="text-xs text-muted-foreground">
@@ -153,7 +153,7 @@ export function SettingsForm() {
         )}
       </section>
 
-      <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
+      <section className="surface flex flex-col gap-4 rounded-xl p-4">
         <div>
           <h3 className="text-sm font-medium">Cursor import</h3>
           <p className="text-xs text-muted-foreground">
@@ -174,7 +174,7 @@ export function SettingsForm() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-border bg-card p-4 text-sm">
+      <section className="surface rounded-xl p-4 text-sm">
         <h3 className="text-sm font-medium">Privacy</h3>
         <ul className="mt-2 flex flex-col gap-1 text-muted-foreground">
           <li>Stored locally: imports, conversations, search index, embeddings.</li>

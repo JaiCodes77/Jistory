@@ -100,7 +100,7 @@ export function AskMentionPicker({
 
   return (
     <div
-      className="absolute inset-x-0 bottom-full z-20 mb-2 overflow-hidden rounded-xl border border-border bg-card"
+      className="absolute inset-x-0 bottom-full z-20 mb-2 overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-[0_16px_40px_-20px_oklch(0.2_0.04_255/0.5)] backdrop-blur-xl"
       role="listbox"
       aria-label="Tag a conversation"
     >

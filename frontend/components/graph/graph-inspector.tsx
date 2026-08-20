@@ -24,7 +24,7 @@ export function GraphInspector({
 
   if (!node) {
     return (
-      <aside className="hidden h-full min-h-0 w-80 shrink-0 flex-col border-l border-border bg-background xl:flex">
+      <aside className="hidden h-full min-h-0 w-80 shrink-0 flex-col border-l border-border/80 bg-background/55 backdrop-blur-xl xl:flex">
         <div className="px-4 py-5">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Inspector</p>
           <h3 className="mt-1 text-sm font-medium">No conversation selected</h3>
@@ -49,7 +49,7 @@ export function GraphInspector({
     .sort((a, b) => b.edge.weight - a.edge.weight)
 
   return (
-    <aside className="flex h-full min-h-0 w-full shrink-0 flex-col border-t border-border bg-background xl:w-80 xl:border-t-0 xl:border-l">
+    <aside className="flex h-full min-h-0 w-full shrink-0 flex-col border-t border-border/80 bg-background/70 backdrop-blur-xl xl:w-80 xl:border-t-0 xl:border-l">
       <div className="border-b border-border px-4 py-4">
         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Conversation</p>
         <h3 className="mt-1 text-sm font-medium leading-snug">{conversationTitle(node.title)}</h3>

@@ -252,7 +252,7 @@ export function CursorImporter({ onStatusChange }: CursorImporterProps) {
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href="/"
-                className="inline-flex h-8 w-fit items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/80"
+                className="inline-flex h-8 w-fit items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground shadow-[0_0_20px_-8px_var(--primary)] hover:bg-primary/88"
               >
                 Open Dashboard
               </Link>

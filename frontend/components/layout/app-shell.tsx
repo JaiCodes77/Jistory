@@ -42,7 +42,8 @@ export function AppShell({ children }: AppShellProps) {
   }, [mobileNavOpen])
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+    <div className="relative flex h-screen overflow-hidden bg-background text-foreground">
+      <div className="pointer-events-none absolute inset-0 bg-app-mesh" />
       <Sidebar
         mobileOpen={mobileNavOpen}
         onNavigate={() => setMobileNavOpen(false)}
@@ -50,12 +51,12 @@ export function AppShell({ children }: AppShellProps) {
       {mobileNavOpen ? (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
           aria-label="Close navigation"
           onClick={() => setMobileNavOpen(false)}
         />
       ) : null}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         <TopNav
           mobileNavOpen={mobileNavOpen}
           onMenuClick={() => setMobileNavOpen((open) => !open)}

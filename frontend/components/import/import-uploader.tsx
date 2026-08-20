@@ -305,8 +305,8 @@ export function ImportUploader() {
               className={cn(
                 "flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed px-6 py-10 text-center transition-colors",
                 dragActive
-                  ? "border-foreground/40 bg-muted/40"
-                  : "border-border bg-background",
+                  ? "border-primary/45 bg-primary/8"
+                  : "border-border bg-background/60",
                 state === "uploading" && "pointer-events-none opacity-70"
               )}
             >
@@ -369,7 +369,7 @@ export function ImportUploader() {
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full bg-primary transition-[width] duration-150"
+                    className="h-full bg-brand-gradient-x transition-[width] duration-150"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
@@ -506,7 +506,7 @@ export function ImportUploader() {
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href="/"
-                className="inline-flex h-8 w-fit items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/80"
+                className="inline-flex h-8 w-fit items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground shadow-[0_0_20px_-8px_var(--primary)] hover:bg-primary/88"
               >
                 Open Dashboard
               </Link>

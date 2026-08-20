@@ -99,7 +99,7 @@ export function ConversationBrowser() {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
       <PageIntro description="Imported chats on this machine. Use / or ⌘K to search inside messages." />
 
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3">
+      <div className="surface flex flex-col gap-3 rounded-xl p-3">
         <div className="grid gap-2 md:grid-cols-4">
           <Input
             value={search}
@@ -184,7 +184,7 @@ export function ConversationBrowser() {
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex items-stretch overflow-hidden rounded-xl border border-border bg-card"
+              className="surface flex items-stretch overflow-hidden rounded-xl"
             >
               <Link
                 href={`/conversations/${item.id}`}

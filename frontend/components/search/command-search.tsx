@@ -110,14 +110,14 @@ export function CommandSearch() {
   const searchHref = `/search?q=${encodeURIComponent(query.trim())}`
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pt-[12vh]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/55 px-4 pt-[12vh] backdrop-blur-sm">
       <button
         type="button"
         className="absolute inset-0 cursor-default"
         aria-label="Close search"
         onClick={close}
       />
-      <div className="relative z-10 w-full max-w-xl overflow-hidden rounded-xl border border-border bg-card">
+      <div className="relative z-10 w-full max-w-xl overflow-hidden rounded-2xl border border-border/80 bg-card/90 shadow-[0_24px_80px_-24px_oklch(0.2_0.04_255/0.55),inset_0_1px_0_oklch(1_0_0/0.06)] backdrop-blur-xl">
         <div className="flex items-center gap-2 border-b border-border px-3">
           <Search className="size-4 text-muted-foreground" />
           <input

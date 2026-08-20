@@ -182,7 +182,7 @@ function GraphBoard({ focusParam }: { focusParam: string | null }) {
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <header className="shrink-0 border-b border-border px-4 py-2.5 md:px-5">
+      <header className="shrink-0 border-b border-border/80 bg-background/50 px-4 py-2.5 backdrop-blur-md md:px-5">
         <div className="flex flex-wrap items-center gap-2">
           <Input
             value={query}
@@ -331,7 +331,7 @@ function GraphBoard({ focusParam }: { focusParam: string | null }) {
 
 function LegendSwatch({ name }: { name: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card/95 px-2 py-1 text-[11px] text-muted-foreground">
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-border/80 bg-card/80 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur-md">
       <span className={cn("size-2 rounded-full", sourceSwatchClass(name))} />
       {name}
     </span>

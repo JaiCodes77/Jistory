@@ -1,13 +1,13 @@
 export const SOURCE_HUES: Record<string, number> = {
-  ChatGPT: 210,
-  Claude: 28,
-  Cursor: 155,
+  ChatGPT: 205,
+  Claude: 48,
+  Cursor: 172,
 }
 
 export const SOURCE_SWATCH: Record<string, string> = {
-  ChatGPT: "bg-[hsl(210_52%_42%)] dark:bg-[hsl(210_48%_64%)]",
-  Claude: "bg-[hsl(28_52%_42%)] dark:bg-[hsl(28_48%_64%)]",
-  Cursor: "bg-[hsl(155_52%_42%)] dark:bg-[hsl(155_48%_64%)]",
+  ChatGPT: "bg-[hsl(205_58%_40%)] dark:bg-[hsl(198_62%_68%)]",
+  Claude: "bg-[hsl(48_62%_40%)] dark:bg-[hsl(42_72%_62%)]",
+  Cursor: "bg-[hsl(172_48%_36%)] dark:bg-[hsl(172_52%_62%)]",
 }
 
 export function sourceHue(source: string): number {
@@ -16,12 +16,12 @@ export function sourceHue(source: string): number {
 
 export function sourceFill(source: string, dark: boolean): string {
   const hue = sourceHue(source)
-  return dark ? `hsl(${hue} 48% 64%)` : `hsl(${hue} 52% 42%)`
+  return dark ? `hsl(${hue} 54% 64%)` : `hsl(${hue} 52% 40%)`
 }
 
 export function sourceRing(source: string, dark: boolean): string {
   const hue = sourceHue(source)
-  return dark ? `hsl(${hue} 40% 78%)` : `hsl(${hue} 50% 32%)`
+  return dark ? `hsl(${hue} 46% 78%)` : `hsl(${hue} 50% 32%)`
 }
 
 export function sourceSwatchClass(source: string): string {

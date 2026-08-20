@@ -79,7 +79,8 @@ export function DashboardView() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-border bg-card px-4 py-4">
+      <section className="surface relative overflow-hidden rounded-xl px-4 py-4">
+        <span className="absolute inset-x-0 top-0 h-px bg-brand-gradient-x opacity-70" />
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-sm font-medium">Memory graph</h3>
@@ -91,7 +92,7 @@ export function DashboardView() {
           </div>
           <Link
             href="/graph"
-            className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-sm hover:bg-muted"
+            className="inline-flex h-8 items-center rounded-lg border border-border/80 bg-card/60 px-2.5 text-sm hover:bg-muted"
           >
             Open graph
           </Link>
@@ -99,7 +100,7 @@ export function DashboardView() {
       </section>
 
       {data.latest_import && (
-        <section className="rounded-xl border border-border bg-card px-4 py-3">
+        <section className="surface rounded-xl px-4 py-3">
           <h3 className="text-sm font-medium">Most recent import</h3>
           <p className="mt-1 text-sm">
             {data.latest_import.filename || data.latest_import.source} ·{" "}
@@ -143,7 +144,7 @@ export function DashboardView() {
                 <Link
                   key={item.id}
                   href={`/conversations/${item.id}`}
-                  className="rounded-xl border border-border bg-card px-3 py-2.5 transition-colors hover:bg-muted/50"
+                  className="surface rounded-xl px-3 py-2.5 transition-colors hover:bg-muted/50"
                 >
                   <p className="truncate text-sm">{conversationTitle(item.title)}</p>
                   <p className="text-[11px] text-muted-foreground">
@@ -191,7 +192,7 @@ function ConversationsChart({
   const activeBucket = buckets.find((item) => item.date === active)
 
   return (
-    <section className="overflow-visible rounded-xl border border-border bg-card px-4 py-3">
+    <section className="surface overflow-visible rounded-xl px-4 py-3">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h3 className="text-sm font-medium">Conversations over time</h3>
@@ -226,8 +227,8 @@ function ConversationsChart({
             <span
               className={
                 bucket.count === 0
-                  ? "min-w-px w-full rounded-sm bg-foreground/20"
-                  : "min-w-px w-full rounded-sm bg-foreground/80"
+                  ? "min-w-px w-full rounded-sm bg-foreground/15"
+                  : "min-w-px w-full rounded-sm bg-brand-gradient"
               }
               style={{
                 height:
@@ -251,7 +252,8 @@ function ConversationsChart({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-card px-4 py-3.5">
+    <div className="surface relative overflow-hidden rounded-xl px-4 py-3.5">
+      <span className="absolute inset-x-0 top-0 h-px bg-brand-gradient-x opacity-60" />
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 truncate text-2xl font-medium tracking-tight" title={value}>
         {value}
