@@ -1,9 +1,9 @@
 import {
   LayoutDashboard,
   MessageSquareText,
+  Network,
   Search,
   Settings,
-  Share2,
   Sparkles,
   Upload,
 } from "lucide-react"
@@ -29,7 +29,7 @@ export const mainNav: NavItem[] = [
   {
     title: "Graph",
     href: "/graph",
-    icon: Share2,
+    icon: Network,
   },
   {
     title: "Search",

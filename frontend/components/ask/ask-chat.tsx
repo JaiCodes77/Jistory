@@ -10,6 +10,7 @@ import { AskSessionSidebar } from "@/components/ask/ask-session-sidebar"
 import { AskSources } from "@/components/ask/ask-sources"
 import { DateRangeChips, rangeToIso, type MemoryRangeKey } from "@/components/memory/date-range-chips"
 import { EmptyState } from "@/components/layout/empty-state"
+import { PageIntro } from "@/components/layout/page-intro"
 import { MessageMarkdown } from "@/components/markdown/message-markdown"
 import { Button } from "@/components/ui/button"
 import { CopyTextButton } from "@/components/ui/copy-text-button"
@@ -362,11 +363,7 @@ export function AskChat() {
       />
     <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-1 flex-col px-6 py-6">
       <div className="mb-6">
-        <h2 className="text-lg font-medium tracking-tight">Ask Jistory</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Answers use only your imported conversations. Type @ to tag specific
-          chats. Retrieved excerpts are sent to Gemini to generate a reply.
-        </p>
+        <PageIntro description="Answers use only your imported conversations. Type @ to tag specific chats. Retrieved excerpts are sent to Gemini to generate a reply." />
       </div>
 
       {hasMemories === false && items.length === 0 ? (

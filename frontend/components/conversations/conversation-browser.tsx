@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react"
 
 import { ForgetButton } from "@/components/conversations/forget-button"
 import { EmptyState } from "@/components/layout/empty-state"
+import { PageIntro } from "@/components/layout/page-intro"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -96,12 +97,7 @@ export function ConversationBrowser() {
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-medium tracking-tight">Conversations</h2>
-        <p className="text-sm text-muted-foreground">
-          Browse imported AI conversations. Use / or ⌘K to search message content.
-        </p>
-      </div>
+      <PageIntro description="Imported chats on this machine. Use / or ⌘K to search inside messages." />
 
       <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3">
         <div className="grid gap-2 md:grid-cols-4">

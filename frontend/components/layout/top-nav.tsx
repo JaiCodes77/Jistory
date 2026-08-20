@@ -37,13 +37,14 @@ export function TopNav({ mobileNavOpen = false, onMenuClick }: TopNavProps) {
         <button
           type="button"
           onClick={() => window.dispatchEvent(new Event("jistory:open-search"))}
-          className="inline-flex items-center gap-2 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted"
+          className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <Search className="size-3" />
           Search
           <kbd className="rounded border border-border px-1">⌘K</kbd>
         </button>
-        <span className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground">
+          <span className="size-1.5 rounded-full bg-foreground/70" />
           Local
         </span>
         <ThemeToggle />

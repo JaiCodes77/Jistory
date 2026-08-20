@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { LoaderCircle } from "lucide-react"
 
+import { PageIntro } from "@/components/layout/page-intro"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -78,12 +79,7 @@ export function SettingsForm() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-8">
-      <div>
-        <h2 className="text-lg font-medium tracking-tight">Settings</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Secrets stay on this machine. They are never returned by the API.
-        </p>
-      </div>
+      <PageIntro description="Secrets stay on this machine. They are never returned by the API." />
 
       <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
         <div>

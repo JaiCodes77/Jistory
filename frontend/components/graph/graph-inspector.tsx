@@ -29,8 +29,7 @@ export function GraphInspector({
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Inspector</p>
           <h3 className="mt-1 text-sm font-medium">No conversation selected</h3>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            Click a node to inspect its links. Double-click to open the thread. Linked chats dim
-            everything else so the neighborhood is readable.
+            Click a node to inspect its links. Double-click opens the thread.
           </p>
         </div>
       </aside>
@@ -104,7 +103,7 @@ export function GraphInspector({
                 key={other.id}
                 type="button"
                 onClick={() => onSelect(other.id)}
-                className="rounded-lg border border-border px-3 py-2 text-left hover:bg-muted/40"
+                className="rounded-lg border border-border bg-card px-3 py-2 text-left hover:bg-muted/50"
               >
                 <div className="flex items-start justify-between gap-2">
                   <p className="truncate text-sm">{conversationTitle(other.title)}</p>

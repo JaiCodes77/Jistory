@@ -68,7 +68,7 @@ export function RelatedConversations({
             <Link
               key={item.id}
               href={`/conversations/${item.id}`}
-              className="rounded-lg border border-border px-3 py-2 hover:bg-muted/40"
+              className="rounded-lg border border-border bg-card px-3 py-2 hover:bg-muted/50"
             >
               <div className="flex items-start justify-between gap-2">
                 <p className="truncate text-sm">{conversationTitle(item.title)}</p>

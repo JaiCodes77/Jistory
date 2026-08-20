@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 
 import { ForgetButton } from "@/components/conversations/forget-button"
 import { EmptyState } from "@/components/layout/empty-state"
+import { PageIntro } from "@/components/layout/page-intro"
 import { Badge } from "@/components/ui/badge"
 import {
   conversationTitle,
@@ -62,12 +63,7 @@ export function DashboardView() {
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-8">
-      <div>
-        <h2 className="text-lg font-medium tracking-tight">Dashboard</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          A snapshot of your local conversation memory.
-        </p>
-      </div>
+      <PageIntro description="A snapshot of conversations stored on this machine." />
 
       <section className="flex flex-col gap-3">
         <div>
@@ -83,11 +79,11 @@ export function DashboardView() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-border bg-card px-4 py-3">
+      <section className="rounded-xl border border-border bg-card px-4 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-sm font-medium">Memory graph</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
               {(data.graph_edges ?? 0) === 0
                 ? "Links appear after indexing, when conversations share topics or similar content."
                 : `${(data.graph_connected ?? 0).toLocaleString()} conversations connected by ${(data.graph_edges ?? 0).toLocaleString()} links.`}
@@ -147,7 +143,7 @@ export function DashboardView() {
                 <Link
                   key={item.id}
                   href={`/conversations/${item.id}`}
-                  className="rounded-xl border border-border px-3 py-2 hover:bg-muted/40"
+                  className="rounded-xl border border-border bg-card px-3 py-2.5 transition-colors hover:bg-muted/50"
                 >
                   <p className="truncate text-sm">{conversationTitle(item.title)}</p>
                   <p className="text-[11px] text-muted-foreground">
@@ -255,7 +251,7 @@ function ConversationsChart({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-card px-4 py-3">
+    <div className="rounded-xl border border-border bg-card px-4 py-3.5">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 truncate text-2xl font-medium tracking-tight" title={value}>
         {value}

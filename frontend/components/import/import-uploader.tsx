@@ -12,6 +12,7 @@ import {
   type IndexBannerState,
 } from "@/components/import/import-status"
 import { ShareLinkImporter } from "@/components/import/share-link-importer"
+import { PageIntro } from "@/components/layout/page-intro"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -218,11 +219,7 @@ export function ImportUploader() {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
       <div className="flex flex-col gap-2">
-        <h2 className="text-lg font-medium tracking-tight">Import</h2>
-        <p className="text-sm text-muted-foreground">
-          Paste a ChatGPT or Claude share link, upload an export ZIP, or import
-          Cursor chats from a file you choose. Everything stays on this machine.
-        </p>
+        <PageIntro description="Paste a ChatGPT or Claude share link, upload an export ZIP, or import Cursor chats from a file you choose. Everything stays on this machine." />
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
           <span>1. Upload or paste</span>
           <span>2. Parse</span>

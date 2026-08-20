@@ -4,7 +4,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
 import { mainNav } from "@/lib/navigation"
 import { cn } from "@/lib/utils"
 
@@ -20,21 +19,23 @@ export function Sidebar({ mobileOpen = false, onNavigate }: SidebarProps) {
     <aside
       id="jistory-sidebar"
       className={cn(
-        "flex h-full w-56 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground",
+        "flex h-full w-56 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground",
         "max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50",
         !mobileOpen && "max-md:hidden"
       )}
     >
-      <div className="flex h-12 items-center gap-2 px-4">
-        <div className="flex size-6 items-center justify-center rounded-md bg-foreground text-[11px] font-semibold text-background">
+      <Link
+        href="/"
+        onClick={onNavigate}
+        className="flex h-12 items-center gap-2.5 px-4 hover:bg-sidebar-accent/50"
+      >
+        <span className="flex size-6 items-center justify-center rounded-md bg-foreground text-[11px] font-semibold text-background">
           J
-        </div>
+        </span>
         <span className="text-sm font-medium tracking-tight">Jistory</span>
-      </div>
+      </Link>
 
-      <Separator />
-
-      <ScrollArea className="flex-1 px-2 py-3">
+      <ScrollArea className="flex-1 px-2 py-2">
         <nav className="flex flex-col gap-0.5">
           {mainNav.map((item) => {
             const Icon = item.icon
@@ -49,13 +50,16 @@ export function Sidebar({ mobileOpen = false, onNavigate }: SidebarProps) {
                 href={item.href}
                 onClick={onNavigate}
                 className={cn(
-                  "flex h-8 items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
+                  "relative flex h-8 items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
                   isActive
                     ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
                     : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
                 )}
                 aria-current={isActive ? "page" : undefined}
               >
+                {isActive ? (
+                  <span className="absolute inset-y-1.5 left-0 w-px rounded-full bg-foreground" />
+                ) : null}
                 <Icon className="size-4 shrink-0 opacity-70" />
                 <span className="truncate">{item.title}</span>
                 {item.href === "/search" && (
@@ -69,12 +73,13 @@ export function Sidebar({ mobileOpen = false, onNavigate }: SidebarProps) {
         </nav>
       </ScrollArea>
 
-      <div className="border-t border-border px-4 py-3">
-        <p className="text-[11px] text-muted-foreground">Local-first memory</p>
+      <div className="border-t border-sidebar-border px-4 py-3">
+        <p className="text-[11px] text-muted-foreground">Stays on this machine</p>
         <p className="mt-1 text-[11px] text-muted-foreground">
-          Search with{" "}
-          <kbd className="rounded border border-border px-1">/</kbd> or{" "}
+          <kbd className="rounded border border-border px-1">/</kbd>
+          {" or "}
           <kbd className="rounded border border-border px-1">⌘K</kbd>
+          {" to search"}
         </p>
       </div>
     </aside>

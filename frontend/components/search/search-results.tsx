@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 
 import { DateRangeChips, rangeToIso, type MemoryRangeKey } from "@/components/memory/date-range-chips"
 import { EmptyState } from "@/components/layout/empty-state"
+import { PageIntro } from "@/components/layout/page-intro"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { conversationTitle, formatDate, getDashboard, listConversationSources, searchMemories } from "@/lib/api"
@@ -81,13 +82,7 @@ export function SearchResults() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
-      <div>
-        <h2 className="text-lg font-medium tracking-tight">Search</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Keyword and semantic search over conversations stored on this machine.
-          Press / or ⌘K from anywhere.
-        </p>
-      </div>
+      <PageIntro description="Keyword and semantic search over conversations on this machine. Press / or ⌘K from anywhere." />
 
       {hasMemories === false ? (
         <EmptyState

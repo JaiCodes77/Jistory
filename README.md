@@ -1,199 +1,77 @@
 # Jistory
 
-Local-first AI conversation memory. Import ChatGPT exports, browse and search what you discussed, then ask questions that are answered only from your history.
+Local-first memory for your AI chats. Import ChatGPT, Claude, or Cursor history, search it, see how conversations connect, and ask questions answered only from that history.
 
-## What is Jistory?
+If your archive does not contain the answer, Jistory says so. It is not a general chatbot.
 
-Jistory stores your AI conversations on your machine and turns them into searchable memory.
+## Run it
 
-Typical questions:
-
-- What conclusion did I reach about Grafana?
-- What did I discuss about Redis over the last two months?
-- Which conversation contained the FastAPI authentication solution?
-
-Jistory is not a general-purpose chatbot. If your history does not contain the answer, it says so.
-
-## Architecture
-
-```text
-ChatGPT ZIP, Claude ZIP, or Cursor state.vscdb
-    → validate / extract (local)
-    → parse into conversations + messages (SQLite)
-    → FTS5 keyword index + local embeddings
-    → hybrid retrieval
-    → Gemini Flash (only retrieved excerpts, only on Ask)
-```
-
-Frontend and backend stay separate. Provider integrations are abstracted (`ConversationParser`, `EmbeddingProvider`, `LLMProvider`) so a Gemini importer can be added later without rewriting retrieval.
-
-## Tech stack
-
-| Layer | Tech |
-| --- | --- |
-| Frontend | Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui |
-| Backend | FastAPI, Python 3.11+, SQLAlchemy, Alembic |
-| Database | SQLite (FTS5 for search, blobs for embeddings) |
-| Embeddings | Local ONNX model via FastEmbed (`BAAI/bge-small-en-v1.5`) |
-| Answers | Gemini Flash (configurable model name) |
-| Package managers | pnpm (frontend), uv (backend) |
-
-## Local setup
-
-Use **Python 3.11–3.13**. Python 3.14 is not supported yet (SQLAlchemy). The backend pins 3.12 via `backend/.python-version`.
-
-### Backend
+Python **3.11–3.13** (3.12 is pinned in `backend/.python-version`). Two terminals:
 
 ```bash
+# terminal 1 — API
 cd backend
 uv sync --group dev
-cp .env.example .env
-# edit .env and set GEMINI_API_KEY if you want Ask Jistory
+cp .env.example .env          # set GEMINI_API_KEY if you want Ask
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
-Health check: [http://localhost:8000/api/health](http://localhost:8000/api/health)
-
-### Frontend
-
 ```bash
+# terminal 2 — app
 cd frontend
 pnpm install
-pnpm dev
+echo 'NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api' > .env.local
+pnpm dev --hostname 127.0.0.1
 ```
 
-App: [http://localhost:3000](http://localhost:3000)
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000). API health: [http://127.0.0.1:8000/api/health](http://127.0.0.1:8000/api/health).
 
-## Environment variables
+Use the same hostname for the app and API (`localhost` or `127.0.0.1`). Mixing them can look like a blank Graph page.
 
-Copy `backend/.env.example` to `backend/.env`. Never commit `.env`.
+## What you can do
+
+| | |
+| --- | --- |
+| **Import** | ChatGPT / Claude export ZIP or share link. Cursor from a local `state.vscdb` (never scans `$HOME` unless you pick a path). |
+| **Browse & search** | Full threads plus `/` or `⌘K` keyword + semantic search. |
+| **Graph** | Conversations as a map. Links are shared title topics or similar content, with a reason you can read. |
+| **Ask** | Gemini answers from retrieved excerpts only. Type `@` to pin a chat. |
+
+Parse stores conversations immediately. Embeddings index in the background; keyword search works as soon as parse finishes.
+
+## Privacy
+
+| Stays on this machine | Leaves only if you use Ask |
+| --- | --- |
+| Exports, conversations, search index, embeddings, API key file | Retrieved excerpts + recent Ask turns to Gemini |
+
+Nothing is logged as conversation content. ZIP path traversal is rejected. The API never returns your Gemini key.
+
+## Config
+
+Copy `backend/.env.example` to `backend/.env`. Do not commit `.env`.
 
 ```text
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash
-DATABASE_URL=sqlite:///./data/jistory.db
-MAX_IMPORT_SIZE_MB=500
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 EMBEDDING_PROVIDER=local
 EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
-RETRIEVAL_LIMIT=8
-CORS_ORIGINS=http://localhost:3000
 ```
 
-`EMBEDDING_PROVIDER=hash` is tests-only. If FastEmbed is missing, indexing fails with a visible error instead of silently using hash embeddings. Keyword search still works after parse.
+You can also save the Gemini key in Settings (`backend/data/settings.json`). Environment variables win.
 
-Frontend:
+`EMBEDDING_PROVIDER=hash` is tests-only.
 
-```text
-NEXT_PUBLIC_API_URL=http://localhost:8000/api
-```
+## Stack
 
-The Gemini API key can also be saved from Settings. That writes a local `settings.json` next to the database. Environment variables take precedence. The API never returns the key.
+Next.js + Tailwind + shadcn · FastAPI + SQLite/FTS5 · local FastEmbed (`bge-small-en-v1.5`) · Gemini Flash on Ask only.
 
-## Importing history
-
-### ChatGPT
-
-1. In ChatGPT: **Settings → Data controls → Export data**.
-2. Download the ZIP.
-3. Open Jistory at [http://localhost:3000](http://localhost:3000).
-4. Go to **Import**.
-5. Choose **ChatGPT**, upload the ZIP, then click **Parse Conversations**.
-
-You can also paste a public `chatgpt.com/share/...` link to import one chat without waiting for the export email.
-
-### Claude
-
-1. In Claude: **Settings → Privacy → Export data**.
-2. Download the ZIP Anthropic emails you.
-3. Open **Import**, choose **Claude**, upload the ZIP, then click **Parse Conversations**.
-
-Public `claude.ai/share/...` links work the same way as ChatGPT shares. Private `claude.ai/chat/...` URLs are rejected.
-
-### Cursor
-
-Cursor has no ChatGPT-style export ZIP. Import is local-file only from a path you choose (Settings or the Import card). Jistory never scans `$HOME` or `~/Library` by default.
-
-Typical file: `state.vscdb` (SQLite). Layouts change across Cursor versions; the importer currently reads:
-
-- `cursorDiskKV` / `ItemTable` keys `composerData:{id}` and `bubbleId:{composerId}:{bubbleId}`
-- `fullConversationHeadersOnly[].type`: 1 = user, 2 = assistant; empty tool bubbles are skipped
-- A folder of `.json` / `.jsonl` transcripts with `messages` / `bubbles`
-
-`external_id` is the composer/chat id, so re-importing the same file updates the existing conversation. Public Cursor share URLs are rejected.
-
-Parse stores conversations immediately, then indexes embeddings in a background thread. Import shows **Indexing embeddings** (including the first FastEmbed model download) until status is **Ready**. Keyword search works as soon as parse finishes.
-
-Exports are extracted under `backend/data/imports/<timestamp>/`. Parsing is idempotent: the same conversation is not duplicated if you import or parse the same export again. Existing SQLite databases get an additive unique index on `(source, external_id)` at startup; Jistory never deletes `backend/data/jistory.db` to apply schema changes.
-
-## Asking Jistory questions
-
-1. Import and parse at least one export.
-2. Open **Ask Jistory**.
-3. Ask a question about your history.
-
-Retrieval uses SQLite FTS5 plus local embeddings, then merges results. Only those retrieved chunks (and recent Ask turns) are sent to Gemini. The backend owns source citations; clicking a source opens the conversation at the matching message.
-
-Follow-up questions keep a bounded Ask session so “Why did I choose it?” can refer to the previous topic.
-
-## Privacy
-
-| Stays on this machine | Leaves the machine |
-| --- | --- |
-| ZIP exports, Cursor `state.vscdb` copies, conversations, messages | Nothing, unless you use Ask Jistory |
-| Full-text index and embeddings | Retrieved excerpts + recent Ask turns, sent to Gemini for an answer |
-| Settings file and API key | The API key is sent only to Google as Gemini authentication |
-
-Conversation content is not written to application logs. Imported files are not served as public static URLs. Path traversal inside ZIP archives is rejected.
-
-## Keyboard shortcuts
-
-- `/` focuses global search when you are not typing in an input
-- `⌘K` / `Ctrl+K` opens global search
-- Enter in the palette opens the Search page at `/search`
-
-## Schema
-
-Startup uses SQLAlchemy `create_all` plus additive `ensure_runtime_schema` (new columns and the conversation unique index). That is the source of truth for the local SQLite file.
+## Develop
 
 ```bash
-uv run alembic upgrade head   # optional; same additive helpers, never drops the DB
+cd backend && uv run pytest && uv run ruff check app tests
+cd frontend && pnpm lint && pnpm exec tsc --noEmit
 ```
 
-## Development commands
-
-```bash
-# backend
-cd backend
-uv sync --group dev
-uv run uvicorn app.main:app --reload --port 8000
-uv run pytest
-uv run ruff check app tests
-uv run alembic upgrade head   # optional; startup also creates tables and additive indexes
-
-# frontend
-cd frontend
-pnpm install
-pnpm dev
-pnpm lint
-pnpm exec tsc --noEmit
-```
-
-## Project structure
-
-```text
-jistory/
-├── backend/
-│   ├── alembic/
-│   ├── app/
-│   │   ├── ask/              # RAG + Ask API
-│   │   ├── conversations/    # browser API
-│   │   ├── embeddings/       # local / gemini / hash providers
-│   │   ├── imports/          # ZIP ingest + parsers
-│   │   ├── llm/              # LLMProvider (Gemini)
-│   │   ├── retrieval/        # FTS + semantic hybrid
-│   │   └── user_settings/
-│   └── tests/
-└── frontend/
-    ├── app/
-    └── components/
-```
+Schema is created at startup (`create_all` plus additive indexes). `uv run alembic upgrade head` is optional and never drops `jistory.db`.
