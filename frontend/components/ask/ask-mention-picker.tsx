@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 
+import { ThreadFilament } from "@/components/layout/thread-filament"
 import { conversationTitle, formatDate, listConversations } from "@/lib/api"
 import type { ConversationSummary } from "@/types/api"
 import { cn } from "@/lib/utils"
@@ -100,7 +101,7 @@ export function AskMentionPicker({
 
   return (
     <div
-      className="absolute inset-x-0 bottom-full z-20 mb-2 overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-[0_16px_40px_-20px_oklch(0.2_0.04_255/0.5)] backdrop-blur-xl"
+      className="absolute inset-x-0 bottom-full z-20 mb-2 overflow-hidden rounded-md border border-border bg-card"
       role="listbox"
       aria-label="Tag a conversation"
     >
@@ -133,7 +134,7 @@ export function AskMentionPicker({
               role="option"
               aria-selected={index === highlight}
               className={cn(
-                "flex w-full flex-col rounded-lg px-2.5 py-2 text-left",
+                "relative flex w-full flex-col rounded-md py-2 pr-2.5 pl-6 text-left",
                 index === highlight ? "bg-muted" : "hover:bg-muted/60"
               )}
               onMouseEnter={() => onActiveIndexChange(index)}
@@ -142,6 +143,7 @@ export function AskMentionPicker({
                 onSelect(item)
               }}
             >
+              <ThreadFilament source={item.source} />
               <span className="truncate text-sm font-medium">
                 {conversationTitle(item.title)}
               </span>

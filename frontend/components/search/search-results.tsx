@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { DateRangeChips, rangeToIso, type MemoryRangeKey } from "@/components/memory/date-range-chips"
 import { EmptyState } from "@/components/layout/empty-state"
 import { PageIntro } from "@/components/layout/page-intro"
+import { ThreadFilament } from "@/components/layout/thread-filament"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { conversationTitle, formatDate, getDashboard, listConversationSources, searchMemories } from "@/lib/api"
@@ -133,7 +134,7 @@ export function SearchResults() {
               setSource(event.target.value)
               setPage(1)
             }}
-            className="h-8 w-full max-w-xs rounded-lg border border-border bg-background px-2 text-sm"
+            className="field-select w-full max-w-xs"
             aria-label="Filter by source"
           >
             <option value="">All sources</option>
@@ -171,8 +172,9 @@ export function SearchResults() {
           <Link
             key={`${hit.conversation_id}:${hit.message_id}:${hit.score}`}
             href={`/conversations/${hit.conversation_id}?message=${hit.message_id}`}
-            className="surface rounded-xl px-4 py-3 hover:bg-muted/40"
+            className="surface relative rounded-lg py-3 pr-4 pl-6 hover:bg-muted/40"
           >
+            <ThreadFilament source={hit.source} />
             <div className="flex items-center justify-between gap-3">
               <p className="truncate text-sm font-medium">
                 {conversationTitle(hit.conversation_title)}

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react"
 import { ForgetButton } from "@/components/conversations/forget-button"
 import { EmptyState } from "@/components/layout/empty-state"
 import { PageIntro } from "@/components/layout/page-intro"
+import { ThreadFilament } from "@/components/layout/thread-filament"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -99,7 +100,7 @@ export function ConversationBrowser() {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
       <PageIntro description="Imported chats on this machine. Use / or ⌘K to search inside messages." />
 
-      <div className="surface flex flex-col gap-3 rounded-xl p-3">
+      <div className="surface flex flex-col gap-3 rounded-lg p-3">
         <div className="grid gap-2 md:grid-cols-4">
           <Input
             value={search}
@@ -112,7 +113,7 @@ export function ConversationBrowser() {
           <select
             value={source}
             onChange={(event) => updateFilter(setSource, event.target.value)}
-            className="h-8 rounded-lg border border-border bg-background px-2 text-sm"
+            className="field-select"
           >
             <option value="">All sources</option>
             {sourceOptions.map((name) => (
@@ -124,7 +125,7 @@ export function ConversationBrowser() {
           <select
             value={range}
             onChange={(event) => updateFilter(setRange, event.target.value)}
-            className="h-8 rounded-lg border border-border bg-background px-2 text-sm"
+            className="field-select"
           >
             {RANGES.map((item) => (
               <option key={item.value} value={item.value}>
@@ -135,7 +136,7 @@ export function ConversationBrowser() {
           <select
             value={sort}
             onChange={(event) => updateFilter(setSort, event.target.value)}
-            className="h-8 rounded-lg border border-border bg-background px-2 text-sm"
+            className="field-select"
           >
             {SORTS.map((item) => (
               <option key={item.value} value={item.value}>
@@ -184,11 +185,12 @@ export function ConversationBrowser() {
           {items.map((item) => (
             <div
               key={item.id}
-              className="surface flex items-stretch overflow-hidden rounded-xl"
+              className="surface relative flex items-stretch overflow-hidden rounded-lg"
             >
+              <ThreadFilament source={item.source} />
               <Link
                 href={`/conversations/${item.id}`}
-                className="min-w-0 flex-1 px-4 py-3 transition-colors hover:bg-muted/40"
+                className="min-w-0 flex-1 py-3 pr-4 pl-6 transition-colors hover:bg-muted/40"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">

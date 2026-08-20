@@ -81,9 +81,9 @@ export function SettingsForm() {
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-8">
       <PageIntro description="Secrets stay on this machine. They are never returned by the API." />
 
-      <section className="surface flex flex-col gap-4 rounded-xl p-4">
+      <section className="surface flex flex-col gap-4 rounded-lg p-4">
         <div>
-          <h3 className="text-sm font-medium">AI</h3>
+          <h3 className="font-heading text-sm tracking-tight">AI</h3>
           <p className="text-xs text-muted-foreground">
             Gemini Flash is used only to generate Ask Jistory answers from retrieved
             excerpts.
@@ -121,9 +121,9 @@ export function SettingsForm() {
         </div>
       </section>
 
-      <section className="surface flex flex-col gap-4 rounded-xl p-4">
+      <section className="surface flex flex-col gap-4 rounded-lg p-4">
         <div>
-          <h3 className="text-sm font-medium">Search</h3>
+          <h3 className="font-heading text-sm tracking-tight">Search</h3>
           <p className="text-xs text-muted-foreground">
             Number of retrieved chunks sent to Gemini with each question.
           </p>
@@ -153,9 +153,9 @@ export function SettingsForm() {
         )}
       </section>
 
-      <section className="surface flex flex-col gap-4 rounded-xl p-4">
+      <section className="surface flex flex-col gap-4 rounded-lg p-4">
         <div>
-          <h3 className="text-sm font-medium">Cursor import</h3>
+          <h3 className="font-heading text-sm tracking-tight">Cursor import</h3>
           <p className="text-xs text-muted-foreground">
             Optional default path to <span className="font-mono">state.vscdb</span> or a
             folder of transcripts. Jistory never scans $HOME or ~/Library on its own.
@@ -174,8 +174,8 @@ export function SettingsForm() {
         </div>
       </section>
 
-      <section className="surface rounded-xl p-4 text-sm">
-        <h3 className="text-sm font-medium">Privacy</h3>
+      <section className="surface rounded-lg p-4 text-sm">
+        <h3 className="font-heading text-sm tracking-tight">Privacy</h3>
         <ul className="mt-2 flex flex-col gap-1 text-muted-foreground">
           <li>Stored locally: imports, conversations, search index, embeddings.</li>
           <li>

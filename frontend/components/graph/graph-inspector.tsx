@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 
+import { ThreadFilament } from "@/components/layout/thread-filament"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { conversationTitle, formatDate } from "@/lib/api"
@@ -24,10 +25,10 @@ export function GraphInspector({
 
   if (!node) {
     return (
-      <aside className="hidden h-full min-h-0 w-80 shrink-0 flex-col border-l border-border/80 bg-background/55 backdrop-blur-xl xl:flex">
+      <aside className="hidden h-full min-h-0 w-80 shrink-0 flex-col border-l border-border bg-sidebar xl:flex">
         <div className="px-4 py-5">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Inspector</p>
-          <h3 className="mt-1 text-sm font-medium">No conversation selected</h3>
+          <h3 className="font-heading mt-1 text-sm leading-snug">No conversation selected</h3>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
             Click a node to inspect its links. Double-click opens the thread.
           </p>
@@ -49,10 +50,11 @@ export function GraphInspector({
     .sort((a, b) => b.edge.weight - a.edge.weight)
 
   return (
-    <aside className="flex h-full min-h-0 w-full shrink-0 flex-col border-t border-border/80 bg-background/70 backdrop-blur-xl xl:w-80 xl:border-t-0 xl:border-l">
-      <div className="border-b border-border px-4 py-4">
+    <aside className="flex h-full min-h-0 w-full shrink-0 flex-col border-t border-border bg-sidebar xl:w-80 xl:border-t-0 xl:border-l">
+      <div className="relative border-b border-border px-4 py-4 pl-6">
+        <ThreadFilament source={node.source} animate />
         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Conversation</p>
-        <h3 className="mt-1 text-sm font-medium leading-snug">{conversationTitle(node.title)}</h3>
+        <h3 className="font-heading mt-1 text-sm leading-snug">{conversationTitle(node.title)}</h3>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <Badge variant="outline" className="gap-1.5">
             <span className={cn("size-2 rounded-full", sourceSwatchClass(node.source))} />
@@ -103,8 +105,9 @@ export function GraphInspector({
                 key={other.id}
                 type="button"
                 onClick={() => onSelect(other.id)}
-                className="rounded-lg border border-border bg-card px-3 py-2 text-left hover:bg-muted/50"
+                className="relative rounded-md border border-border bg-card py-2 pr-3 pl-6 text-left hover:bg-muted/50"
               >
+                <ThreadFilament source={other.source} />
                 <div className="flex items-start justify-between gap-2">
                   <p className="truncate text-sm">{conversationTitle(other.title)}</p>
                   <span className="shrink-0 text-[11px] text-muted-foreground">

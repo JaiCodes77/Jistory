@@ -7,6 +7,7 @@ import { conversationTitle, formatDate, getRelatedConversations } from "@/lib/ap
 import { formatWeight, sourceSwatchClass } from "@/lib/graph-style"
 import { cn } from "@/lib/utils"
 import type { RelatedConversation } from "@/types/api"
+import { ThreadFilament } from "@/components/layout/thread-filament"
 
 export function RelatedConversations({
   conversationId,
@@ -41,7 +42,7 @@ export function RelatedConversations({
     <section className={cn("flex flex-col gap-3", compact ? "" : "h-full min-h-0 px-4 py-5")}>
       <div className="flex items-baseline justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium">Related conversations</h3>
+          <h3 className="font-heading text-sm tracking-tight">Related conversations</h3>
           <p className="text-xs text-muted-foreground">Why these chats connect.</p>
         </div>
         <Link
@@ -68,8 +69,9 @@ export function RelatedConversations({
             <Link
               key={item.id}
               href={`/conversations/${item.id}`}
-              className="surface rounded-lg px-3 py-2 hover:bg-muted/50"
+              className="surface relative rounded-md px-3 py-2 pl-6 hover:bg-muted/50"
             >
+              <ThreadFilament source={item.source} />
               <div className="flex items-start justify-between gap-2">
                 <p className="truncate text-sm">{conversationTitle(item.title)}</p>
                 <span className="shrink-0 text-[11px] text-muted-foreground">

@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { ExpandableMessage } from "@/components/conversations/expandable-message"
 import { ForgetButton } from "@/components/conversations/forget-button"
 import { RelatedConversations } from "@/components/graph/related-conversations"
+import { ThreadFilament } from "@/components/layout/thread-filament"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CopyTextButton } from "@/components/ui/copy-text-button"
@@ -25,10 +26,10 @@ const PAGE_SIZE = 80
 const MAX_RENDERED = 160
 
 const ROLE_STYLES: Record<string, string> = {
-  user: "border-border/80 bg-muted/35",
-  assistant: "border-border/80 bg-card/80 backdrop-blur-md",
-  system: "border-border/80 bg-background/50 text-muted-foreground",
-  tool: "border-border/80 bg-background/50 text-muted-foreground",
+  user: "border-border bg-muted/50",
+  assistant: "border-border bg-card",
+  system: "border-border bg-background text-muted-foreground",
+  tool: "border-border bg-background text-muted-foreground",
 }
 
 function mergeMessages(current: MessageItem[], incoming: MessageItem[]): MessageItem[] {
@@ -272,9 +273,10 @@ export function ConversationThread({ conversationId }: { conversationId: string 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {conversation && (
-        <div className="mb-4 shrink-0 border-b border-border pb-4">
+        <div className="relative mb-4 shrink-0 border-b border-border pb-4 pl-6">
+          <ThreadFilament source={conversation.source} animate />
           <div className="flex items-start justify-between gap-4">
-            <h2 className="text-lg font-medium tracking-tight">
+            <h2 className="font-heading text-lg tracking-tight">
               {conversationTitle(conversation.title)}
             </h2>
             <ForgetButton
@@ -321,12 +323,13 @@ export function ConversationThread({ conversationId }: { conversationId: string 
                 : { contentVisibility: "auto", containIntrinsicSize: "auto 120px" }
             }
             className={cn(
-              "scroll-mt-6 rounded-xl border px-4 py-3",
+              "relative scroll-mt-6 rounded-lg border py-3 pr-4 pl-6",
               ROLE_STYLES[message.role] ?? ROLE_STYLES.system,
               highlightId === message.id &&
                 "border-primary/40 bg-primary/8 ring-2 ring-primary/35"
             )}
           >
+            <ThreadFilament source={conversation?.source} />
             <div className="mb-2 flex items-center justify-between gap-3">
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 {formatRole(message.role)}
@@ -365,7 +368,7 @@ export function ConversationThread({ conversationId }: { conversationId: string 
         )}
       </div>
       </div>
-      <aside className="hidden min-h-0 w-80 shrink-0 overflow-auto border-l border-border/80 bg-background/50 backdrop-blur-xl lg:block">
+      <aside className="hidden min-h-0 w-80 shrink-0 overflow-auto border-l border-border bg-sidebar lg:block">
         <RelatedConversations key={conversationId} conversationId={conversationId} />
       </aside>
     </div>

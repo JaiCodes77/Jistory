@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { ChevronDown, ChevronRight } from "lucide-react"
 
+import { ThreadFilament } from "@/components/layout/thread-filament"
 import { Button } from "@/components/ui/button"
 import { conversationTitle, formatDate } from "@/lib/api"
 import type { SourceReference } from "@/types/api"
@@ -65,8 +66,9 @@ export function AskSources({ sources }: { sources: SourceReference[] }) {
             <li key={`${source.conversation_id}-${source.message_id ?? sourceIndex}`}>
               <Link
                 href={sourceHref(source)}
-                className="block rounded-lg px-2 py-1.5 hover:bg-muted"
+                className="relative block rounded-md py-1.5 pr-2 pl-6 hover:bg-muted"
               >
+                <ThreadFilament source={source.source} />
                 <p className="text-sm">
                   {sourceIndex + 1}. {conversationTitle(source.title)}
                 </p>

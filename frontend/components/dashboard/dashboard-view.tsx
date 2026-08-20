@@ -6,7 +6,9 @@ import { useEffect, useState } from "react"
 import { ForgetButton } from "@/components/conversations/forget-button"
 import { EmptyState } from "@/components/layout/empty-state"
 import { PageIntro } from "@/components/layout/page-intro"
+import { ThreadFilament } from "@/components/layout/thread-filament"
 import { Badge } from "@/components/ui/badge"
+import { buttonVariants } from "@/components/ui/button"
 import {
   conversationTitle,
   forgetImportJob,
@@ -65,9 +67,26 @@ export function DashboardView() {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-8">
       <PageIntro description="A snapshot of conversations stored on this machine." />
 
+      <section className="surface relative rounded-lg px-4 py-4 pl-6">
+        <ThreadFilament />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-heading text-base tracking-tight">Memory graph</h3>
+            <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+              {(data.graph_edges ?? 0) === 0
+                ? "Links appear after indexing, when conversations share topics or similar content."
+                : `${(data.graph_connected ?? 0).toLocaleString()} conversations connected by ${(data.graph_edges ?? 0).toLocaleString()} links.`}
+            </p>
+          </div>
+          <Link href="/graph" className={buttonVariants({ variant: "outline" })}>
+            Open graph
+          </Link>
+        </div>
+      </section>
+
       <section className="flex flex-col gap-3">
         <div>
-          <h3 className="text-sm font-medium">Overview</h3>
+          <h3 className="font-heading text-sm tracking-tight">Overview</h3>
           <p className="text-xs text-muted-foreground">
             Counts from conversations stored on this machine.
           </p>
@@ -79,29 +98,9 @@ export function DashboardView() {
         </div>
       </section>
 
-      <section className="surface relative overflow-hidden rounded-xl px-4 py-4">
-        <span className="absolute inset-x-0 top-0 h-px bg-brand-gradient-x opacity-70" />
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-medium">Memory graph</h3>
-            <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-              {(data.graph_edges ?? 0) === 0
-                ? "Links appear after indexing, when conversations share topics or similar content."
-                : `${(data.graph_connected ?? 0).toLocaleString()} conversations connected by ${(data.graph_edges ?? 0).toLocaleString()} links.`}
-            </p>
-          </div>
-          <Link
-            href="/graph"
-            className="inline-flex h-8 items-center rounded-lg border border-border/80 bg-card/60 px-2.5 text-sm hover:bg-muted"
-          >
-            Open graph
-          </Link>
-        </div>
-      </section>
-
       {data.latest_import && (
-        <section className="surface rounded-xl px-4 py-3">
-          <h3 className="text-sm font-medium">Most recent import</h3>
+        <section className="surface rounded-lg px-4 py-3">
+          <h3 className="font-heading text-sm tracking-tight">Most recent import</h3>
           <p className="mt-1 text-sm">
             {data.latest_import.filename || data.latest_import.source} ·{" "}
             {formatImportedAt(data.latest_import.imported_at)}
@@ -133,7 +132,7 @@ export function DashboardView() {
       <div className="grid gap-8 lg:grid-cols-2">
         <section className="min-w-0">
           <div className="mb-3">
-            <h3 className="text-sm font-medium">Recent conversations</h3>
+            <h3 className="font-heading text-sm tracking-tight">Recent conversations</h3>
             <p className="text-xs text-muted-foreground">Newest activity first.</p>
           </div>
           {data.recent_conversations.length === 0 ? (
@@ -144,8 +143,9 @@ export function DashboardView() {
                 <Link
                   key={item.id}
                   href={`/conversations/${item.id}`}
-                  className="surface rounded-xl px-3 py-2.5 transition-colors hover:bg-muted/50"
+                  className="surface relative rounded-lg px-3 py-2.5 pl-6 transition-colors hover:bg-muted/50"
                 >
+                  <ThreadFilament source={item.source} />
                   <p className="truncate text-sm">{conversationTitle(item.title)}</p>
                   <p className="text-[11px] text-muted-foreground">
                     {item.source} · {formatDate(item.updated_at)} · {item.message_count} messages
@@ -157,7 +157,7 @@ export function DashboardView() {
         </section>
         <section className="min-w-0">
           <div className="mb-3">
-            <h3 className="text-sm font-medium">Frequently discussed</h3>
+            <h3 className="font-heading text-sm tracking-tight">Frequently discussed</h3>
             <p className="text-xs text-muted-foreground">
               Words that appear in more than one conversation title.
             </p>
@@ -192,10 +192,10 @@ function ConversationsChart({
   const activeBucket = buckets.find((item) => item.date === active)
 
   return (
-    <section className="surface overflow-visible rounded-xl px-4 py-3">
+    <section className="surface overflow-visible rounded-lg px-4 py-3">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h3 className="text-sm font-medium">Conversations over time</h3>
+          <h3 className="font-heading text-sm tracking-tight">Conversations over time</h3>
           <p className="text-xs text-muted-foreground">One bar per day. Empty days are short ticks.</p>
         </div>
         <p className="min-h-4 text-[11px] tabular-nums text-foreground/70">
@@ -228,7 +228,7 @@ function ConversationsChart({
               className={
                 bucket.count === 0
                   ? "min-w-px w-full rounded-sm bg-foreground/15"
-                  : "min-w-px w-full rounded-sm bg-brand-gradient"
+                  : "min-w-px w-full rounded-sm bg-primary"
               }
               style={{
                 height:
@@ -252,10 +252,9 @@ function ConversationsChart({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="surface relative overflow-hidden rounded-xl px-4 py-3.5">
-      <span className="absolute inset-x-0 top-0 h-px bg-brand-gradient-x opacity-60" />
+    <div className="surface rounded-lg px-4 py-3.5">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 truncate text-2xl font-medium tracking-tight" title={value}>
+      <p className="font-heading mt-1 truncate text-2xl tracking-tight" title={value}>
         {value}
       </p>
     </div>

@@ -13,7 +13,7 @@ import {
 } from "@/components/import/import-status"
 import { ShareLinkImporter } from "@/components/import/share-link-importer"
 import { PageIntro } from "@/components/layout/page-intro"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -369,7 +369,7 @@ export function ImportUploader() {
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full bg-brand-gradient-x transition-[width] duration-150"
+                    className="h-full bg-primary transition-[width] duration-150"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
@@ -506,19 +506,19 @@ export function ImportUploader() {
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href="/"
-                className="inline-flex h-8 w-fit items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground shadow-[0_0_20px_-8px_var(--primary)] hover:bg-primary/88"
+                className={buttonVariants()}
               >
                 Open Dashboard
               </Link>
               <Link
                 href="/ask"
-                className="inline-flex h-8 w-fit items-center rounded-lg border border-border px-2.5 text-sm hover:bg-muted"
+                className={buttonVariants({ variant: "outline" })}
               >
                 Ask Jistory
               </Link>
               <Link
                 href="/conversations"
-                className="inline-flex h-8 w-fit items-center rounded-lg border border-border px-2.5 text-sm hover:bg-muted"
+                className={buttonVariants({ variant: "outline" })}
               >
                 Browse conversations
               </Link>
@@ -559,7 +559,7 @@ function StatBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-border px-3 py-3">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-medium tracking-tight">{value}</p>
+      <p className="font-heading mt-1 text-2xl tracking-tight">{value}</p>
     </div>
   )
 }

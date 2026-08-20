@@ -10,7 +10,7 @@ export function BrandLogo({ size = 28, className, alt = "" }: BrandLogoProps) {
   return (
     <span
       className={cn(
-        "relative inline-flex shrink-0 overflow-hidden rounded-full bg-[#0b0e14] shadow-[0_0_18px_-6px_color-mix(in_oklch,var(--brand-cyan)_70%,var(--brand-gold))]",
+        "relative inline-flex shrink-0 overflow-hidden rounded-full bg-[#0e1418] ring-1 ring-border",
         className
       )}
       style={{ width: size, height: size }}

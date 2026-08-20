@@ -11,6 +11,7 @@ import { AskSources } from "@/components/ask/ask-sources"
 import { DateRangeChips, rangeToIso, type MemoryRangeKey } from "@/components/memory/date-range-chips"
 import { EmptyState } from "@/components/layout/empty-state"
 import { PageIntro } from "@/components/layout/page-intro"
+import { ThreadFilament } from "@/components/layout/thread-filament"
 import { MessageMarkdown } from "@/components/markdown/message-markdown"
 import { Button } from "@/components/ui/button"
 import { CopyTextButton } from "@/components/ui/copy-text-button"
@@ -374,7 +375,8 @@ export function AskChat() {
       ) : (
         <>
           {apiKeyConfigured === false && (
-            <div className="surface mb-4 rounded-xl px-4 py-3 text-sm">
+            <div className="surface relative mb-4 rounded-lg px-4 py-3 pl-6 text-sm">
+              <ThreadFilament />
               <p className="font-medium">Gemini is not configured.</p>
               <p className="mt-1 text-muted-foreground">
                 Add GEMINI_API_KEY in Settings or your backend .env file to generate answers.
@@ -397,10 +399,11 @@ export function AskChat() {
           <div
             key={`${item.role}-${index}`}
             className={cn(
-              "rounded-xl border border-border/80 px-4 py-3",
-              item.role === "user" ? "bg-muted/35" : "bg-card/80 backdrop-blur-md"
+              "relative rounded-lg border border-border py-3 pr-4 pl-6",
+              item.role === "user" ? "bg-muted/50" : "bg-card"
             )}
           >
+            <ThreadFilament />
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 {item.role === "user" ? "You" : "Jistory"}
@@ -462,7 +465,7 @@ export function AskChat() {
                 onSelect={selectMention}
               />
             )}
-            <div className="rounded-xl border border-border/80 bg-card/70 backdrop-blur-md focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/40">
+            <div className="rounded-md border border-border bg-card focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/40">
               <div className="px-3 pt-2">
                 <DateRangeChips
                   range={dateRange}

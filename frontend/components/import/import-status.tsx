@@ -23,7 +23,7 @@ export function ImportIndexBanner({
 }) {
   if (state.indexing) {
     return (
-      <div className="rounded-xl border border-primary/25 bg-primary/8 px-4 py-3">
+      <div className="rounded-lg border border-primary/25 bg-primary/8 px-4 py-3">
         <div className="flex items-start gap-2">
           <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin" />
           <div>
@@ -42,7 +42,7 @@ export function ImportIndexBanner({
 
   if (state.indexError) {
     return (
-      <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
         <div className="flex items-start gap-2">
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
           <div>
@@ -70,7 +70,7 @@ export function ImportIndexBanner({
 
   if (state.keywordReady && !state.indexing) {
     return (
-      <div className="rounded-xl border border-border bg-muted/40 px-4 py-3">
+      <div className="rounded-lg border border-border bg-muted/40 px-4 py-3">
         <div className="flex items-start gap-2">
           <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
           <div>

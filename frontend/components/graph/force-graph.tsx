@@ -359,7 +359,7 @@ export function ForceGraphCanvas({
       />
       {hover && (
         <div
-          className="pointer-events-none absolute z-10 w-72 rounded-xl border border-border/80 bg-card/90 px-3 py-2 shadow-[inset_0_1px_0_oklch(1_0_0/0.06)] backdrop-blur-xl"
+          className="pointer-events-none absolute z-10 w-72 rounded-md border border-border bg-card px-3 py-2"
           style={{
             left: Math.max(8, Math.min(hover.x + 14, hover.wrapW - 300)),
             top: Math.max(8, Math.min(hover.y + 14, hover.wrapH - 132)),

@@ -8,17 +8,17 @@ import { cn } from "@/lib/utils"
 
 const markdownComponents: Components = {
   h1: ({ children }) => (
-    <h1 className="mt-4 mb-2 text-base font-semibold tracking-tight first:mt-0">
+    <h1 className="font-heading mt-4 mb-2 text-base tracking-tight first:mt-0">
       {children}
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 className="mt-4 mb-2 text-[15px] font-semibold tracking-tight first:mt-0">
+    <h2 className="font-heading mt-4 mb-2 text-[15px] tracking-tight first:mt-0">
       {children}
     </h2>
   ),
   h3: ({ children }) => (
-    <h3 className="mt-3 mb-1.5 text-sm font-semibold tracking-tight first:mt-0">
+    <h3 className="font-heading mt-3 mb-1.5 text-sm tracking-tight first:mt-0">
       {children}
     </h3>
   ),
@@ -34,7 +34,7 @@ const markdownComponents: Components = {
   ),
   li: ({ children }) => <li className="leading-6 [&>p]:my-1">{children}</li>,
   blockquote: ({ children }) => (
-    <blockquote className="my-3 border-l-2 border-border pl-3 text-muted-foreground">
+    <blockquote className="my-3 border-l-2 border-primary/50 pl-3 text-muted-foreground">
       {children}
     </blockquote>
   ),
@@ -98,7 +98,7 @@ export function MessageMarkdown({
   if (!content) return null
 
   return (
-    <div className={cn("jistory-markdown text-sm leading-6 break-words", className)}>
+    <div className={cn("jistory-markdown break-words", className)}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
         {content}
       </ReactMarkdown>

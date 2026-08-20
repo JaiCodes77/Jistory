@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Link2, LoaderCircle } from "lucide-react"
 
 import { ImportError, type IndexBannerState } from "@/components/import/import-status"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -152,13 +152,13 @@ export function ShareLinkImporter({ onStatusChange }: ShareLinkImporterProps) {
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg border border-border px-3 py-3">
                 <p className="text-xs text-muted-foreground">Conversations</p>
-                <p className="mt-1 text-2xl font-medium tracking-tight">
+                <p className="font-heading mt-1 text-2xl tracking-tight">
                   {result.conversations.toLocaleString()}
                 </p>
               </div>
               <div className="rounded-lg border border-border px-3 py-3">
                 <p className="text-xs text-muted-foreground">Messages</p>
-                <p className="mt-1 text-2xl font-medium tracking-tight">
+                <p className="font-heading mt-1 text-2xl tracking-tight">
                   {result.messages.toLocaleString()}
                 </p>
               </div>
@@ -167,13 +167,13 @@ export function ShareLinkImporter({ onStatusChange }: ShareLinkImporterProps) {
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href="/"
-                className="inline-flex h-8 w-fit items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground shadow-[0_0_20px_-8px_var(--primary)] hover:bg-primary/88"
+                className={buttonVariants()}
               >
                 Open Dashboard
               </Link>
               <Link
                 href="/ask"
-                className="inline-flex h-8 w-fit items-center rounded-lg border border-border px-2.5 text-sm hover:bg-muted"
+                className={buttonVariants({ variant: "outline" })}
               >
                 Ask Jistory
               </Link>
